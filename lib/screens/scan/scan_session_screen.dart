@@ -439,13 +439,22 @@ class _SafeImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (path.startsWith('http')) {
+      return Image.network(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _fallback(),
+      );
+    }
     final file = File(path);
     if (file.existsSync()) {
       return Image.file(file, fit: BoxFit.cover);
     }
-    return Container(
-      color: AppColors.divider,
-      child: const Icon(Icons.image, color: AppColors.textMuted),
-    );
+    return _fallback();
   }
+
+  Widget _fallback() => Container(
+        color: AppColors.divider,
+        child: const Icon(Icons.image, color: AppColors.textMuted),
+      );
 }

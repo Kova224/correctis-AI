@@ -695,8 +695,7 @@ class _HeaderAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasPhoto = user.photoPath != null &&
-        (user.photoPath as String).isNotEmpty;
+    final photoPath = user.photoPath as String?;
     return Padding(
       padding: const EdgeInsets.only(left: 8),
       child: Material(
@@ -709,23 +708,31 @@ class _HeaderAvatar extends StatelessWidget {
             width: 40,
             height: 40,
             child: ClipOval(
-              child: hasPhoto && File(user.photoPath as String).existsSync()
-                  ? Image.file(File(user.photoPath as String),
-                      fit: BoxFit.cover)
-                  : Center(
-                      child: Text(
-                        _initials,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
+              child: _renderHeaderPhoto(photoPath) ??
+                  Center(
+                    child: Text(
+                      _initials,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
                       ),
                     ),
+                  ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  Widget? _renderHeaderPhoto(String? path) {
+    if (path == null || path.isEmpty) return null;
+    if (path.startsWith('http')) {
+      return Image.network(path, fit: BoxFit.cover);
+    }
+    final file = File(path);
+    if (!file.existsSync()) return null;
+    return Image.file(file, fit: BoxFit.cover);
   }
 }

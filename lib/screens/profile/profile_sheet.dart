@@ -397,6 +397,18 @@ class _Avatar extends StatelessWidget {
     return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 
+  /// Retourne l'Image (file ou network) ou null si pas affichable.
+  Widget? _renderPhoto() {
+    final p = photoPath;
+    if (p == null || p.isEmpty) return null;
+    if (p.startsWith('http')) {
+      return Image.network(p, fit: BoxFit.cover);
+    }
+    final file = File(p);
+    if (!file.existsSync()) return null;
+    return Image.file(file, fit: BoxFit.cover);
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasPhoto = photoPath != null && photoPath!.isNotEmpty;
@@ -424,8 +436,8 @@ class _Avatar extends StatelessWidget {
                 child: CircularProgressIndicator(
                     color: Colors.white, strokeWidth: 2),
               )
-            : (hasPhoto && File(photoPath!).existsSync()
-                ? Image.file(File(photoPath!), fit: BoxFit.cover)
+            : (hasPhoto && _renderPhoto() != null
+                ? _renderPhoto()!
                 : Center(
                     child: Text(
                       _initials,

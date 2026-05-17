@@ -11,6 +11,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/primary_button.dart';
 import '../../widgets/rounded_header.dart';
 import '../../widgets/section_card.dart';
+import '../../widgets/smart_image.dart';
 import '../../widgets/status_chip.dart';
 
 /// Détail d'une copie : note par question, commentaires, image en regard,
@@ -155,17 +156,12 @@ class _StudentCopyDetailScreenState extends State<StudentCopyDetailScreen> {
                       separatorBuilder: (_, __) => const SizedBox(width: 10),
                       itemBuilder: (context, i) {
                         final path = copy.pageImages[i];
-                        final file = File(path);
                         return ClipRRect(
                           borderRadius: BorderRadius.circular(14),
-                          child: Container(
+                          child: SmartImage(
+                            path: path,
                             width: 130,
-                            color: AppColors.surfaceMuted,
-                            child: file.existsSync()
-                                ? Image.file(file, fit: BoxFit.cover)
-                                : const Center(
-                                    child: Icon(Icons.image,
-                                        color: AppColors.textMuted)),
+                            fit: BoxFit.cover,
                           ),
                         );
                       },

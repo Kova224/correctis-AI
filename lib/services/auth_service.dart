@@ -1,90 +1,145 @@
-import 'dart:convert';
+import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
+import '../config/supabase_config.dart';
 import '../models/app_user.dart';
 
-/// Service d'auth en mode démo.
-/// Stocke l'utilisateur courant dans SharedPreferences.
-/// À remplacer par FirebaseAuth en prod (cf. cahier §3.1).
+/// Service d'authentification basé sur Supabase Auth + table `profiles`.
+///
+/// La séparation `auth.users` ↔ `profiles` est gérée par un trigger SQL :
+/// à l'inscription, un profil est créé automatiquement avec les infos de base.
 class AuthService extends ChangeNotifier {
-  static const _kCurrentUserKey = 'correctis.currentUser';
-  static const _kUsersKey = 'correctis.users';
+  AuthService() {
+    // Écoute les changements d'état d'authentification (login/logout/refresh)
+    _authSub = _client.auth.onAuthStateChange.listen((event) {
+      _syncFromSupabase();
+    });
+  }
 
+  sb.SupabaseClient get _client => sb.Supabase.instance.client;
+
+  StreamSubscription<sb.AuthState>? _authSub;
   AppUser? _currentUser;
+
   AppUser? get currentUser => _currentUser;
   bool get isLoggedIn => _currentUser != null;
 
-  Future<void> bootstrap() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_kCurrentUserKey);
-    if (raw != null) {
-      _currentUser = AppUser.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-      notifyListeners();
-    }
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
   }
 
+  // ---------------------------------------------------------------------------
+  // Bootstrap : restaure la session si l'utilisateur était déjà connecté.
+  // ---------------------------------------------------------------------------
+  Future<void> bootstrap() async {
+    await _syncFromSupabase();
+  }
+
+  Future<void> _syncFromSupabase() async {
+    final session = _client.auth.currentSession;
+    if (session == null) {
+      _currentUser = null;
+      notifyListeners();
+      return;
+    }
+    final user = session.user;
+    try {
+      // Récupère le profil étendu
+      final row = await _client
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+      _currentUser = AppUser(
+        id: user.id,
+        email: row?['email'] as String? ?? user.email ?? '',
+        displayName: row?['display_name'] as String? ?? '',
+        photoPath: row?['photo_path'] as String?,
+        phone: row?['phone'] as String?,
+        school: row?['school'] as String?,
+      );
+    } catch (e) {
+      // Pas grave si le profil n'est pas encore créé — on utilise les infos auth basiques
+      _currentUser = AppUser(
+        id: user.id,
+        email: user.email ?? '',
+        displayName: user.email?.split('@').first ?? '',
+      );
+    }
+    notifyListeners();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Inscription
+  // ---------------------------------------------------------------------------
   Future<AppUser> register({
     required String email,
     required String password,
     required String displayName,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    final prefs = await SharedPreferences.getInstance();
-    final users = _readUsers(prefs);
-    if (users.any((u) => u['email'] == email)) {
-      throw 'Un compte existe déjà avec cet email.';
-    }
-    final user = AppUser(
-      id: const Uuid().v4(),
-      email: email,
-      displayName: displayName,
-    );
-    users.add({
-      ...user.toJson(),
-      'password': password, // OK en démo, jamais en prod
-    });
-    await prefs.setString(_kUsersKey, jsonEncode(users));
-    await _persistCurrent(prefs, user);
-    return user;
-  }
-
-  Future<AppUser> login({required String email, required String password}) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    final prefs = await SharedPreferences.getInstance();
-    final users = _readUsers(prefs);
-    final match = users.firstWhere(
-      (u) => u['email'] == email && u['password'] == password,
-      orElse: () => <String, dynamic>{},
-    );
-    if (match.isEmpty) {
-      // En démo, on accepte aussi un compte de test rapide
-      if (email == 'demo@correctis.app' && password == 'demo1234') {
-        final demoUser = AppUser(
-          id: 'demo-user',
-          email: email,
-          displayName: 'Prof. Démo',
-        );
-        await _persistCurrent(prefs, demoUser);
-        return demoUser;
+    try {
+      final res = await _client.auth.signUp(
+        email: email.trim(),
+        password: password,
+        data: {'displayName': displayName.trim()},
+      );
+      if (res.user == null) {
+        throw 'Inscription échouée. Réessayez.';
       }
-      throw 'Identifiants invalides.';
+      // Le trigger SQL `handle_new_user` crée le profil automatiquement.
+      // On force un upsert au cas où (display_name + email).
+      await _client.from('profiles').upsert({
+        'id': res.user!.id,
+        'email': email.trim(),
+        'display_name': displayName.trim(),
+      });
+      await _syncFromSupabase();
+      return _currentUser!;
+    } on sb.AuthException catch (e) {
+      throw _translateAuth(e.message);
+    } catch (e) {
+      throw '$e';
     }
-    final user = AppUser.fromJson(match);
-    await _persistCurrent(prefs, user);
-    return user;
   }
 
+  // ---------------------------------------------------------------------------
+  // Connexion email + password
+  // ---------------------------------------------------------------------------
+  Future<AppUser> login({required String email, required String password}) async {
+    try {
+      final res = await _client.auth.signInWithPassword(
+        email: email.trim(),
+        password: password,
+      );
+      if (res.user == null) {
+        throw 'Identifiants invalides.';
+      }
+      await _syncFromSupabase();
+      return _currentUser!;
+    } on sb.AuthException catch (e) {
+      throw _translateAuth(e.message);
+    } catch (e) {
+      throw '$e';
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Déconnexion
+  // ---------------------------------------------------------------------------
   Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_kCurrentUserKey);
+    await _client.auth.signOut();
     _currentUser = null;
     notifyListeners();
   }
 
-  /// Met à jour le profil (nom, email, photo, école, téléphone).
+  // ---------------------------------------------------------------------------
+  // Mise à jour du profil (nom, email, photo, école, téléphone)
+  // ---------------------------------------------------------------------------
   Future<void> updateProfile({
     String? displayName,
     String? email,
@@ -93,175 +148,177 @@ class AuthService extends ChangeNotifier {
     String? school,
   }) async {
     if (_currentUser == null) return;
-    final updated = _currentUser!.copyWith(
-      displayName: displayName,
-      email: email,
-      photoPath: photoPath,
-      phone: phone,
-      school: school,
-    );
-    final prefs = await SharedPreferences.getInstance();
-    final users = _readUsers(prefs);
-    final idx = users.indexWhere((u) => u['id'] == updated.id);
-    if (idx >= 0) {
-      users[idx] = {
-        ...users[idx], // garde le password
-        ...updated.toJson(),
-      };
-      await prefs.setString(_kUsersKey, jsonEncode(users));
-    }
-    await _persistCurrent(prefs, updated);
-  }
 
-  /// Vérifie qu'un compte existe avec cet email (utilisé par "Mot de passe oublié").
-  Future<bool> emailExists(String email) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    final prefs = await SharedPreferences.getInstance();
-    final users = _readUsers(prefs);
-    if (email == 'demo@correctis.app') return true;
-    return users.any((u) => u['email'] == email);
-  }
-
-  /// Réinitialise le mot de passe d'un compte (mode démo : on remplace directement).
-  /// En prod : Firebase Auth → sendPasswordResetEmail(email) qui envoie un lien.
-  Future<void> resetPassword({
-    required String email,
-    required String newPassword,
-  }) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (newPassword.length < 4) throw 'Mot de passe trop court (min. 4 car.).';
-    final prefs = await SharedPreferences.getInstance();
-    final users = _readUsers(prefs);
-
-    // Cas du compte démo : créer une entrée si elle n'existe pas
-    if (email == 'demo@correctis.app') {
-      final idx = users.indexWhere((u) => u['email'] == email);
-      if (idx >= 0) {
-        users[idx] = {...users[idx], 'password': newPassword};
-      } else {
-        users.add({
-          'id': 'demo-user',
-          'email': email,
-          'displayName': 'Prof. Démo',
-          'password': newPassword,
-        });
+    // Upload avatar dans le bucket "avatars" si c'est un fichier local
+    String? uploadedPhotoPath = photoPath;
+    if (photoPath != null &&
+        photoPath.isNotEmpty &&
+        !photoPath.startsWith('http')) {
+      final file = File(photoPath);
+      if (file.existsSync()) {
+        try {
+          final dotIdx = photoPath.lastIndexOf('.');
+          final ext = dotIdx >= 0 ? photoPath.substring(dotIdx) : '.jpg';
+          final remotePath = '${_currentUser!.id}/avatar$ext';
+          await _client.storage
+              .from(SupabaseConfig.avatarsBucket)
+              .upload(
+                remotePath,
+                file,
+                fileOptions: const sb.FileOptions(upsert: true),
+              );
+          uploadedPhotoPath = _client.storage
+              .from(SupabaseConfig.avatarsBucket)
+              .getPublicUrl(remotePath);
+        } catch (e) {
+          // Si le bucket n'est pas dispo, garde le chemin local
+          uploadedPhotoPath = photoPath;
+        }
       }
-      await prefs.setString(_kUsersKey, jsonEncode(users));
-      return;
+    } else if (photoPath == '') {
+      uploadedPhotoPath = null; // retrait de la photo
     }
 
-    final idx = users.indexWhere((u) => u['email'] == email);
-    if (idx < 0) throw 'Aucun compte trouvé avec cet email.';
-    users[idx] = {...users[idx], 'password': newPassword};
-    await prefs.setString(_kUsersKey, jsonEncode(users));
-  }
+    final update = <String, dynamic>{
+      if (displayName != null) 'display_name': displayName,
+      if (email != null) 'email': email,
+      if (phone != null) 'phone': phone,
+      if (school != null) 'school': school,
+      if (uploadedPhotoPath != photoPath || photoPath == '')
+        'photo_path': uploadedPhotoPath,
+      if (photoPath != null && uploadedPhotoPath != null)
+        'photo_path': uploadedPhotoPath,
+    };
 
-  /// Connexion via Google (mock).
-  /// En prod : `google_sign_in` + `firebase_auth` `signInWithCredential`.
-  Future<AppUser> signInWithGoogle() => _signInWithProvider(
-        provider: 'google',
-        defaultEmail: 'professeur@gmail.com',
-        defaultName: 'Professeur Google',
-      );
-
-  /// Connexion via Facebook (mock).
-  /// En prod : `flutter_facebook_auth` + Firebase Auth.
-  Future<AppUser> signInWithFacebook() => _signInWithProvider(
-        provider: 'facebook',
-        defaultEmail: 'professeur@facebook.com',
-        defaultName: 'Professeur Facebook',
-      );
-
-  /// Connexion via Instagram (mock).
-  /// En prod : OAuth Instagram via webview ou plugin tiers.
-  Future<AppUser> signInWithInstagram() => _signInWithProvider(
-        provider: 'instagram',
-        defaultEmail: 'professeur@instagram.com',
-        defaultName: 'Professeur Instagram',
-      );
-
-  /// Connexion via LinkedIn (mock).
-  /// En prod : OAuth LinkedIn (linkedin_login plugin).
-  Future<AppUser> signInWithLinkedIn() => _signInWithProvider(
-        provider: 'linkedin',
-        defaultEmail: 'professeur@linkedin.com',
-        defaultName: 'Professeur LinkedIn',
-      );
-
-  /// Implémentation commune des connexions sociales (mock).
-  Future<AppUser> _signInWithProvider({
-    required String provider,
-    required String defaultEmail,
-    required String defaultName,
-  }) async {
-    await Future.delayed(const Duration(milliseconds: 900));
-    final prefs = await SharedPreferences.getInstance();
-    final users = _readUsers(prefs);
-
-    var match = users.firstWhere(
-      (u) => u['provider'] == provider,
-      orElse: () => <String, dynamic>{},
-    );
-
-    AppUser user;
-    if (match.isEmpty) {
-      user = AppUser(
-        id: '$provider-${const Uuid().v4()}',
-        email: defaultEmail,
-        displayName: defaultName,
-      );
-      users.add({
-        ...user.toJson(),
-        'provider': provider,
-      });
-      await prefs.setString(_kUsersKey, jsonEncode(users));
-    } else {
-      user = AppUser.fromJson(match);
+    if (update.isNotEmpty) {
+      await _client
+          .from('profiles')
+          .update(update)
+          .eq('id', _currentUser!.id);
     }
 
-    await _persistCurrent(prefs, user);
-    return user;
+    // Met à jour aussi l'email dans auth.users si fourni
+    if (email != null && email != _currentUser!.email) {
+      try {
+        await _client.auth
+            .updateUser(sb.UserAttributes(email: email));
+      } catch (_) {
+        // L'utilisateur devra peut-être confirmer son email — on ignore l'erreur ici
+      }
+    }
+
+    await _syncFromSupabase();
   }
 
-  /// Change le mot de passe (mode démo).
-  /// En prod, déclencher un email de reset via Firebase.
+  // ---------------------------------------------------------------------------
+  // Changement de mot de passe (utilisateur connecté)
+  // ---------------------------------------------------------------------------
   Future<void> changePassword({
     required String currentPassword,
     required String newPassword,
   }) async {
     if (_currentUser == null) throw 'Aucun utilisateur connecté.';
-    if (newPassword.length < 4) throw 'Mot de passe trop court (min. 4 car.).';
-    final prefs = await SharedPreferences.getInstance();
-    final users = _readUsers(prefs);
-    final idx = users.indexWhere((u) => u['id'] == _currentUser!.id);
-    if (idx < 0) throw 'Utilisateur introuvable.';
-    final stored = users[idx]['password'] as String? ?? '';
-    // En mode démo, le compte de test n'a pas de password stocké → on accepte demo1234.
-    final isDemo = _currentUser!.id == 'demo-user';
-    if (!isDemo && stored != currentPassword) {
+    if (newPassword.length < 6) {
+      throw 'Mot de passe trop court (min. 6 caractères).';
+    }
+    // Vérifie le mot de passe actuel en se reconnectant
+    try {
+      await _client.auth.signInWithPassword(
+        email: _currentUser!.email,
+        password: currentPassword,
+      );
+    } on sb.AuthException {
       throw 'Mot de passe actuel incorrect.';
     }
-    if (isDemo && currentPassword != 'demo1234') {
-      throw 'Mot de passe actuel incorrect.';
+    try {
+      await _client.auth.updateUser(
+        sb.UserAttributes(password: newPassword),
+      );
+    } on sb.AuthException catch (e) {
+      throw _translateAuth(e.message);
     }
-    users[idx] = {
-      ...users[idx],
-      'password': newPassword,
-    };
-    await prefs.setString(_kUsersKey, jsonEncode(users));
   }
 
-  // --- helpers ---
-  List<Map<String, dynamic>> _readUsers(SharedPreferences prefs) {
-    final raw = prefs.getString(_kUsersKey);
-    if (raw == null) return <Map<String, dynamic>>[];
-    final list = jsonDecode(raw) as List<dynamic>;
-    return list.cast<Map<String, dynamic>>();
+  // ---------------------------------------------------------------------------
+  // Mot de passe oublié : envoie un email avec lien de reset (Supabase)
+  // ---------------------------------------------------------------------------
+  Future<bool> emailExists(String email) async {
+    // Supabase ne permet pas de vérifier l'existence d'un email côté client
+    // (pour des raisons de sécurité). On retourne toujours true et on laisse
+    // resetPasswordForEmail se débrouiller silencieusement si l'email n'existe pas.
+    return true;
   }
 
-  Future<void> _persistCurrent(SharedPreferences prefs, AppUser user) async {
-    _currentUser = user;
-    await prefs.setString(_kCurrentUserKey, jsonEncode(user.toJson()));
-    notifyListeners();
+  Future<void> resetPassword({
+    required String email,
+    required String newPassword, // ignoré : Supabase envoie un email
+  }) async {
+    try {
+      await _client.auth.resetPasswordForEmail(email.trim());
+      // L'utilisateur reçoit un email avec un lien magique pour définir un nouveau mdp.
+    } on sb.AuthException catch (e) {
+      throw _translateAuth(e.message);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // OAuth — Google / Facebook / LinkedIn (Supabase OAuth)
+  // ---------------------------------------------------------------------------
+  Future<AppUser> signInWithGoogle() => _signInWithOAuth(sb.OAuthProvider.google);
+  Future<AppUser> signInWithFacebook() =>
+      _signInWithOAuth(sb.OAuthProvider.facebook);
+  Future<AppUser> signInWithLinkedIn() =>
+      _signInWithOAuth(sb.OAuthProvider.linkedinOidc);
+
+  /// Instagram n'est pas un provider Supabase natif — pour le démo,
+  /// on bascule sur LinkedIn ou on indique "bientôt disponible".
+  Future<AppUser> signInWithInstagram() async {
+    throw 'Connexion Instagram bientôt disponible. Utilisez Google ou Facebook.';
+  }
+
+  Future<AppUser> _signInWithOAuth(sb.OAuthProvider provider) async {
+    try {
+      await _client.auth.signInWithOAuth(
+        provider,
+        redirectTo: 'correctis://login-callback',
+      );
+      // La méthode revient avant la fin du flow OAuth (qui se passe en webview).
+      // On attend que onAuthStateChange déclenche le sync.
+      await Future.delayed(const Duration(seconds: 1));
+      // Si pas encore connecté, on lance un sync silencieux.
+      await _syncFromSupabase();
+      if (_currentUser == null) {
+        throw 'La connexion OAuth a été annulée ou n\'a pas abouti.';
+      }
+      return _currentUser!;
+    } on sb.AuthException catch (e) {
+      throw _translateAuth(e.message);
+    } catch (e) {
+      throw '$e';
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Traduction des erreurs Supabase en messages clairs FR
+  // ---------------------------------------------------------------------------
+  String _translateAuth(String msg) {
+    final m = msg.toLowerCase();
+    if (m.contains('invalid login')) return 'Identifiants invalides.';
+    if (m.contains('email not confirmed')) {
+      return 'Veuillez confirmer votre email avant de vous connecter.';
+    }
+    if (m.contains('user already registered') || m.contains('already exists')) {
+      return 'Un compte existe déjà avec cet email.';
+    }
+    if (m.contains('password should be at least')) {
+      return 'Mot de passe trop court (min. 6 caractères).';
+    }
+    if (m.contains('rate limit')) {
+      return 'Trop de tentatives. Réessayez dans une minute.';
+    }
+    if (m.contains('weak password')) {
+      return 'Mot de passe trop faible. Choisissez une combinaison plus complexe.';
+    }
+    return msg;
   }
 }
