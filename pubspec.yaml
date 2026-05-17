@@ -1,0 +1,49 @@
+name: correctis
+description: "Correctis - Correction IA de copies par les enseignants (MVP)."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.6
+
+  # State management
+  provider: ^6.1.2
+
+  # UI / fonts
+  google_fonts: ^6.2.1
+
+  # Camera & image handling
+  image_picker: ^1.1.2
+  path_provider: ^2.1.4
+
+  # Files & exports
+  excel: ^4.0.6
+  share_plus: ^10.0.2
+  open_filex: ^4.5.0
+
+  # Utils
+  intl: ^0.19.0
+  uuid: ^4.5.1
+
+  # Local persistence (mock backend)
+  shared_preferences: ^2.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  # Activez quand vous ajouterez les assets
+  # assets:
+  #   - assets/images/
+  #   - assets/icons/
