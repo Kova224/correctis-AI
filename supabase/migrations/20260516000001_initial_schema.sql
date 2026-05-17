@@ -11,7 +11,7 @@ create extension if not exists "pgcrypto" with schema extensions;
 -- =============================================================================
 -- 1. PROFILES (extension de auth.users)
 -- =============================================================================
-create table public.profiles (
+create table if not exists public.profiles (
   id            uuid primary key references auth.users(id) on delete cascade,
   email         text not null,
   display_name  text not null default '',
@@ -27,7 +27,7 @@ comment on table public.profiles is 'Profil étendu du professeur (1-1 avec auth
 -- =============================================================================
 -- 2. EXAMS
 -- =============================================================================
-create table public.exams (
+create table if not exists public.exams (
   id                  uuid primary key default extensions.gen_random_uuid(),
   owner_id            uuid not null references auth.users(id) on delete cascade,
   title               text not null,
@@ -42,13 +42,13 @@ create table public.exams (
   updated_at          timestamptz not null default now()
 );
 
-create index exams_owner_idx on public.exams(owner_id);
-create index exams_class_idx on public.exams(class_name);
+create index if not exists exams_owner_idx on public.exams(owner_id);
+create index if not exists exams_class_idx on public.exams(class_name);
 
 -- =============================================================================
 -- 3. QUESTIONS (exercices ou questions simples)
 -- =============================================================================
-create table public.questions (
+create table if not exists public.questions (
   id          uuid primary key default extensions.gen_random_uuid(),
   exam_id     uuid not null references public.exams(id) on delete cascade,
   position    int not null default 0,
@@ -58,13 +58,13 @@ create table public.questions (
   created_at  timestamptz not null default now()
 );
 
-create index questions_exam_idx on public.questions(exam_id);
-create index questions_position_idx on public.questions(exam_id, position);
+create index if not exists questions_exam_idx on public.questions(exam_id);
+create index if not exists questions_position_idx on public.questions(exam_id, position);
 
 -- =============================================================================
 -- 4. SUB_QUESTIONS (a, b, c… optionnelles)
 -- =============================================================================
-create table public.sub_questions (
+create table if not exists public.sub_questions (
   id            uuid primary key default extensions.gen_random_uuid(),
   question_id   uuid not null references public.questions(id) on delete cascade,
   position      int not null default 0,
@@ -74,14 +74,14 @@ create table public.sub_questions (
   created_at    timestamptz not null default now()
 );
 
-create index sub_questions_question_idx on public.sub_questions(question_id);
+create index if not exists sub_questions_question_idx on public.sub_questions(question_id);
 
 -- =============================================================================
 -- 5. STUDENT_COPIES (copies scannées)
 -- =============================================================================
 create type public.copy_status as enum ('pending', 'processing', 'graded', 'error');
 
-create table public.student_copies (
+create table if not exists public.student_copies (
   id              uuid primary key default extensions.gen_random_uuid(),
   exam_id         uuid not null references public.exams(id) on delete cascade,
   student_name    text not null,
@@ -94,13 +94,13 @@ create table public.student_copies (
   graded_at       timestamptz
 );
 
-create index student_copies_exam_idx on public.student_copies(exam_id);
-create index student_copies_status_idx on public.student_copies(status);
+create index if not exists student_copies_exam_idx on public.student_copies(exam_id);
+create index if not exists student_copies_status_idx on public.student_copies(status);
 
 -- =============================================================================
 -- 6. QUESTION_GRADES (note par leaf — question simple ou sous-question)
 -- =============================================================================
-create table public.question_grades (
+create table if not exists public.question_grades (
   id          uuid primary key default extensions.gen_random_uuid(),
   copy_id     uuid not null references public.student_copies(id) on delete cascade,
   leaf_id     uuid not null,                 -- id de question OU sub_question
@@ -109,8 +109,8 @@ create table public.question_grades (
   created_at  timestamptz not null default now()
 );
 
-create index question_grades_copy_idx on public.question_grades(copy_id);
-create unique index question_grades_unique on public.question_grades(copy_id, leaf_id);
+create index if not exists question_grades_copy_idx on public.question_grades(copy_id);
+create unique index if not exists question_grades_unique on public.question_grades(copy_id, leaf_id);
 
 -- =============================================================================
 -- 7. Trigger : auto-création du profil à l'inscription
