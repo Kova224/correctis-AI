@@ -91,14 +91,29 @@ class AuthService extends ChangeNotifier {
       if (res.user == null) {
         throw 'Inscription échouée. Réessayez.';
       }
-      // Le trigger SQL `handle_new_user` crée le profil automatiquement.
-      // On force un upsert au cas où (display_name + email).
-      await _client.from('profiles').upsert({
-        'id': res.user!.id,
-        'email': email.trim(),
-        'display_name': displayName.trim(),
-      });
+      // Le trigger SQL `handle_new_user` crée le profil automatiquement
+      // avec le displayName depuis raw_user_meta_data — pas d'upsert nécessaire.
+
+      // Si la confirmation email est désactivée, on est auto-connecté.
+      // Si elle est activée, on tente une connexion immédiate (sera bloquée
+      // si l'utilisateur doit confirmer son email).
+      if (res.session == null) {
+        try {
+          await _client.auth.signInWithPassword(
+            email: email.trim(),
+            password: password,
+          );
+        } on sb.AuthException catch (e) {
+          if (e.message.toLowerCase().contains('email not confirmed')) {
+            throw 'Compte créé. Vérifiez votre email pour confirmer avant de vous connecter.';
+          }
+          rethrow;
+        }
+      }
       await _syncFromSupabase();
+      if (_currentUser == null) {
+        throw 'Inscription créée — connectez-vous maintenant.';
+      }
       return _currentUser!;
     } on sb.AuthException catch (e) {
       throw _translateAuth(e.message);
@@ -119,11 +134,25 @@ class AuthService extends ChangeNotifier {
       if (res.user == null) {
         throw 'Identifiants invalides.';
       }
-      await _syncFromSupabase();
+      // Construit un user minimal IMMÉDIATEMENT pour ne pas dépendre du fetch profil
+      _currentUser = AppUser(
+        id: res.user!.id,
+        email: res.user!.email ?? email.trim(),
+        displayName: '',
+      );
+      notifyListeners();
+      // Charge le profil complet en arrière-plan (n'échoue jamais)
+      try {
+        await _syncFromSupabase();
+      } catch (_) {
+        // ignore : on garde le user minimal
+      }
       return _currentUser!;
     } on sb.AuthException catch (e) {
+      debugPrint('Login error (AuthException): ${e.message}');
       throw _translateAuth(e.message);
     } catch (e) {
+      debugPrint('Login error: $e');
       throw '$e';
     }
   }

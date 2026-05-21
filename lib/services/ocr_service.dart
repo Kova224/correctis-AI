@@ -1,26 +1,117 @@
+import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
+
+import '../config/supabase_config.dart';
 import '../models/exam.dart';
 import '../models/question.dart';
 
-/// Service OCR multilingue — mode démo.
-/// En prod : Google Cloud Vision (OCR) + LLM (extraction structurée des questions).
+/// Service OCR multilingue.
 ///
-/// Le mock simule de manière plausible l'extraction d'un sujet structuré :
-/// **exercices** (numérotés) contenant des **sous-questions** (a, b, c…),
-/// avec énoncés multilignes incluant symboles, équations, formules.
+/// EN PROD : appelle l'Edge Function `extract-questions` qui fait
+/// Google Cloud Vision (OCR) + Claude (structuration).
 ///
-/// IMPORTANT : sans vraie OCR connectée, ce service génère du contenu
-/// type. Pour reproduire exactement le sujet d'une photo, il faudra :
-///   1) brancher Google Cloud Vision (vraie OCR)
-///   2) brancher un LLM (Claude/GPT) pour structurer la sortie
+/// FALLBACK : si l'Edge Function échoue (clés non configurées, réseau…),
+/// retombe sur un générateur de contenu type (mock) pour ne pas bloquer l'app.
 class OcrService {
+  static const _uuid = Uuid();
+
+  SupabaseClient get _client => Supabase.instance.client;
+
   /// Extrait les exercices et leur barème d'un sujet importé.
+  ///
+  /// 1. Upload les images locales vers le bucket `subjects`
+  /// 2. Appelle l'Edge Function `extract-questions`
+  /// 3. Si échec → fallback mock
   Future<List<Question>> extractQuestionsFromSubject(
     List<String> imagePaths, {
     ExamLanguage language = ExamLanguage.french,
     ExamType examType = ExamType.general,
   }) async {
+    try {
+      final urls = await _uploadSubjectImages(imagePaths);
+      if (urls.isEmpty) throw 'Aucune image à analyser.';
+
+      final res = await _client.functions.invoke(
+        'extract-questions',
+        body: {
+          'imageUrls': urls,
+          'language': language.code,
+          'examType': examType.code,
+        },
+      );
+      final data = res.data;
+      if (data == null || data['error'] != null) {
+        throw data?['error'] ?? 'Erreur extraction OCR.';
+      }
+      final questions = _parseQuestions(data['questions'] as List<dynamic>);
+      if (questions.isEmpty) throw 'Aucune question détectée.';
+      return questions;
+    } catch (e) {
+      debugPrint('OcrService: extraction réelle échouée → mock. Cause: $e');
+      return _mockExtract(imagePaths, language, examType);
+    }
+  }
+
+  /// Upload les images du sujet vers Supabase Storage, renvoie les URLs publiques.
+  Future<List<String>> _uploadSubjectImages(List<String> paths) async {
+    final userId = _client.auth.currentUser?.id ?? 'anon';
+    final urls = <String>[];
+    for (final path in paths) {
+      if (path.startsWith('http')) {
+        urls.add(path);
+        continue;
+      }
+      final file = File(path);
+      if (!file.existsSync()) continue;
+      final dotIdx = path.lastIndexOf('.');
+      final ext = dotIdx >= 0 ? path.substring(dotIdx) : '.jpg';
+      final remotePath = '$userId/${_uuid.v4()}$ext';
+      await _client.storage
+          .from(SupabaseConfig.subjectsBucket)
+          .upload(remotePath, file);
+      urls.add(
+        _client.storage
+            .from(SupabaseConfig.subjectsBucket)
+            .getPublicUrl(remotePath),
+      );
+    }
+    return urls;
+  }
+
+  /// Convertit la réponse JSON de l'Edge Function en List<Question>.
+  List<Question> _parseQuestions(List<dynamic> raw) {
+    return raw.map((q) {
+      final map = q as Map<String, dynamic>;
+      final subsRaw = (map['subQuestions'] as List<dynamic>?) ?? const [];
+      final subs = subsRaw.map((s) {
+        final sm = s as Map<String, dynamic>;
+        return SubQuestion(
+          label: sm['label'] as String? ?? '',
+          statement: sm['statement'] as String? ?? '',
+          points: (sm['points'] as num?)?.toDouble() ?? 0,
+        );
+      }).toList();
+      return Question(
+        label: map['label'] as String? ?? 'Question',
+        statement: map['statement'] as String? ?? '',
+        points: (map['points'] as num?)?.toDouble() ?? 0,
+        subQuestions: subs,
+      );
+    }).toList();
+  }
+
+  // ===========================================================================
+  // FALLBACK MOCK — générateur de contenu type
+  // ===========================================================================
+  Future<List<Question>> _mockExtract(
+    List<String> imagePaths,
+    ExamLanguage language,
+    ExamType examType,
+  ) async {
     final delay = Duration(
       milliseconds: 1500 + 700 * imagePaths.length.clamp(1, 5),
     );

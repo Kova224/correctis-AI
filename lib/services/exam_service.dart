@@ -277,6 +277,17 @@ class ExamService extends ChangeNotifier {
 
   Future<void> _runCorrection(Exam exam, StudentCopy copy) async {
     try {
+      // 1. Tente la correction réelle via l'Edge Function `grade-copy`
+      //    (elle fait OCR + notation + mise à jour DB côté serveur).
+      final remote = await _ai.gradeCopyRemote(copy.id);
+      if (remote.success) {
+        await _refreshCopyFromDb(copy.id);
+        return;
+      }
+      debugPrint(
+          'Correction réelle indisponible (${remote.error}) → fallback mock.');
+
+      // 2. Fallback : correction simulée localement.
       final res = await _ai.gradeCopy(exam: exam, copy: copy);
       copy.grades
         ..clear()
@@ -286,9 +297,31 @@ class ExamService extends ChangeNotifier {
       copy.status = CopyStatus.graded;
       copy.gradedAt = DateTime.now();
       await updateCopy(copy);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('_runCorrection error: $e');
       copy.status = CopyStatus.error;
       await updateCopy(copy);
+    }
+  }
+
+  /// Recharge une copie depuis la base (après correction par l'Edge Function).
+  Future<void> _refreshCopyFromDb(String copyId) async {
+    try {
+      final row = await _client
+          .from('student_copies')
+          .select('*, question_grades(*)')
+          .eq('id', copyId)
+          .single();
+      final fresh = _copyFromRow(row);
+      final idx = _copies.indexWhere((c) => c.id == copyId);
+      if (idx >= 0) {
+        _copies[idx] = fresh;
+      } else {
+        _copies.add(fresh);
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('_refreshCopyFromDb error: $e');
     }
   }
 

@@ -23,8 +23,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen>
     with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
-  final _email = TextEditingController(text: 'demo@correctis.app');
-  final _password = TextEditingController(text: 'demo1234');
+  final _email = TextEditingController();
+  final _password = TextEditingController();
   bool _loading = false;
   bool _googleLoading = false;
   String? _socialLoading; // 'facebook', 'instagram', 'linkedin'
@@ -346,8 +346,8 @@ class _LoginScreenState extends State<LoginScreen>
                           textInputAction: TextInputAction.done,
                           onSubmitted: (_) => _login(),
                           validator: (v) {
-                            if (v == null || v.length < 4) {
-                              return 'Mot de passe trop court';
+                            if (v == null || v.length < 6) {
+                              return 'Mot de passe trop court (min. 6 caractères)';
                             }
                             return null;
                           },

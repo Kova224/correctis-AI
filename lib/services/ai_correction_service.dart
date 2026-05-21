@@ -1,11 +1,47 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../models/copy.dart';
 import '../models/exam.dart';
 
-/// Service de correction IA — mode démo.
-/// En prod : appel d'une LLM API (cahier §3.5).
+/// Résultat d'une correction par l'Edge Function.
+class RemoteGradeResult {
+  final bool success;
+  final String? error;
+  const RemoteGradeResult({required this.success, this.error});
+}
+
+/// Service de correction IA.
+///
+/// EN PROD : appelle l'Edge Function `grade-copy` (Claude + Vision côté serveur).
+/// La fonction fait l'OCR, note la copie, et met à jour la DB directement.
+///
+/// FALLBACK : si l'Edge Function échoue, le mock local prend le relais.
 class AiCorrectionService {
+  SupabaseClient get _client => Supabase.instance.client;
+
+  /// Corrige une copie via l'Edge Function `grade-copy`.
+  /// La fonction met à jour la copie en base — il suffit ensuite de la
+  /// recharger côté app. Retourne le succès / l'erreur.
+  Future<RemoteGradeResult> gradeCopyRemote(String copyId) async {
+    try {
+      final res = await _client.functions.invoke(
+        'grade-copy',
+        body: {'copyId': copyId},
+      );
+      final data = res.data;
+      if (data != null && data['error'] != null) {
+        return RemoteGradeResult(success: false, error: '${data['error']}');
+      }
+      return const RemoteGradeResult(success: true);
+    } catch (e) {
+      debugPrint('AiCorrectionService: grade-copy échoué. Cause: $e');
+      return RemoteGradeResult(success: false, error: '$e');
+    }
+  }
+
   /// Génère un corrigé type à partir des questions (option C).
   Future<String> generateAnswerKey(Exam exam) async {
     await Future.delayed(const Duration(seconds: 2));
