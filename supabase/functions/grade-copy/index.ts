@@ -1,16 +1,16 @@
 // =============================================================================
-// Edge Function : grade-copy  (VERSION AUTONOME)
+// Edge Function : grade-copy  (Claude Vision uniquement)
 // Input  : { copyId: string }
-// Output : { grades: [...], generalComment: string, confidence: number }
 //
-// Pipeline : charge copie+examen → Vision OCR → Claude (notation) → update DB
-//
-// Déployable par copier-coller dans le dashboard Supabase.
+// Claude reçoit dans un même appel :
+//   1. Les pages de la copie de l'élève (images)
+//   2. Les documents du corrigé type / cours (images, si fournis)
+//   3. La structure du sujet (texte)
+//   → Il comprend l'écriture manuscrite, croise avec le corrigé, et note.
 // =============================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// --- CORS --------------------------------------------------------------------
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -18,52 +18,15 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// --- Secrets -----------------------------------------------------------------
-const VISION_API_KEY = Deno.env.get("GOOGLE_VISION_API_KEY") ?? "";
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const CLAUDE_MODEL = Deno.env.get("CLAUDE_MODEL") ?? "claude-haiku-4-5-20251001";
 
-// --- Google Cloud Vision -----------------------------------------------------
-async function ocrImageFromUrl(imageUrl: string): Promise<string> {
-  if (!VISION_API_KEY) {
-    throw new Error("GOOGLE_VISION_API_KEY manquant (Supabase secrets).");
-  }
-  const endpoint =
-    `https://vision.googleapis.com/v1/images:annotate?key=${VISION_API_KEY}`;
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      requests: [
-        {
-          image: { source: { imageUri: imageUrl } },
-          features: [{ type: "DOCUMENT_TEXT_DETECTION", maxResults: 1 }],
-          imageContext: { languageHints: ["fr", "en", "ar"] },
-        },
-      ],
-    }),
-  });
-  if (!res.ok) {
-    throw new Error(`Vision API ${res.status}: ${await res.text()}`);
-  }
-  const data = await res.json();
-  return data?.responses?.[0]?.fullTextAnnotation?.text ?? "";
-}
-
-async function ocrMultipleImages(urls: string[]): Promise<string> {
-  const texts: string[] = [];
-  for (let i = 0; i < urls.length; i++) {
-    texts.push(`--- PAGE ${i + 1} ---\n${await ocrImageFromUrl(urls[i])}`);
-  }
-  return texts.join("\n\n");
-}
-
-// --- Anthropic Claude --------------------------------------------------------
 async function callClaude(
-  system: string,
-  user: string,
-  maxTokens = 3072,
-  temperature = 0.2,
+  systemPrompt: string,
+  // deno-lint-ignore no-explicit-any
+  content: any[],
+  maxTokens = 4096,
+  temperature = 0.15,
 ): Promise<string> {
   if (!ANTHROPIC_API_KEY) {
     throw new Error("ANTHROPIC_API_KEY manquant (Supabase secrets).");
@@ -79,8 +42,8 @@ async function callClaude(
       model: CLAUDE_MODEL,
       max_tokens: maxTokens,
       temperature,
-      system,
-      messages: [{ role: "user", content: user }],
+      system: systemPrompt,
+      messages: [{ role: "user", content }],
     }),
   });
   if (!res.ok) {
@@ -105,30 +68,31 @@ function extractJson(rawText: string): any {
   }
 }
 
-// --- Prompt système ----------------------------------------------------------
 const SYSTEM_PROMPT =
-  `Tu es un correcteur expert et juste. Tu corriges des copies d'élèves selon un barème précis.
+  `Tu es un correcteur expert, juste et bienveillant. Tu corriges des copies d'élèves
+en regardant leurs photos (écriture manuscrite incluse) et en t'appuyant sur le corrigé
+ou le cours fourni.
 
 Règles ABSOLUES :
-- Note chaque question/sous-question STRICTEMENT selon le barème fourni
-- N'attribue jamais plus de points que le barème n'autorise
-- Les notes doivent être en pas de 0,5 (0, 0,5, 1, 1,5, 2…)
-- Commente brièvement chaque note (1-2 phrases max, pédagogique et bienveillant)
-- Donne un commentaire général d'ensemble en 2-3 phrases
-- Indique ton niveau de confiance entre 0 et 1 (0 = très incertain, 1 = très sûr)
+- Lis attentivement la copie de l'élève (écriture manuscrite, schémas, calculs)
+- Croise avec le corrigé type / le cours fourni pour évaluer l'exactitude
+- Note STRICTEMENT selon le barème (n'attribue jamais plus que la note max)
+- Notes en pas de 0,5 (0, 0,5, 1, 1,5, 2…)
+- Commentaire bref pour chaque note (1-2 phrases, pédagogique)
+- Commentaire général d'ensemble (2-3 phrases)
+- Confiance entre 0 et 1 (0 = écriture illisible, 1 = très sûr)
 - Sortie : UNIQUEMENT du JSON valide, AUCUN texte ni markdown autour
 
-Format JSON attendu :
+Format JSON :
 {
   "grades": [
     { "leafId": "<uuid>", "score": 1.5, "comment": "Bonne démonstration mais erreur de calcul." },
     { "leafId": "<uuid>", "score": 2, "comment": "Excellent." }
   ],
-  "generalComment": "Bonne copie dans l'ensemble.",
+  "generalComment": "Bonne copie, à consolider sur les démonstrations.",
   "confidence": 0.85
 }`;
 
-// --- Handler -----------------------------------------------------------------
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -173,13 +137,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       throw new Error("Aucune page à corriger.");
     }
 
-    // 3. OCR de la copie
-    const studentText = await ocrMultipleImages(copy.page_images);
-    if (!studentText.trim()) {
-      throw new Error("Aucun texte détecté sur la copie.");
-    }
-
-    // 4. Prépare la structure du sujet pour le prompt
+    // 3. Prépare la structure du sujet (texte pour le prompt)
     // deno-lint-ignore no-explicit-any
     const questionsForPrompt = (exam.questions ?? []).map((q: any) => {
       // deno-lint-ignore no-explicit-any
@@ -199,32 +157,76 @@ Deno.serve(async (req: Request): Promise<Response> => {
         };
     });
 
-    const correctionSource = exam.correction_source
-      ? JSON.stringify(exam.correction_source)
-      : "Aucun corrigé fourni — utilise tes connaissances générales.";
+    // 4. Récupère le corrigé type / cours
+    const correctionSource = exam.correction_source ?? {};
+    const correctionType: string = correctionSource.type ?? "";
+    const correctionDocs: string[] = correctionSource.documentPaths ?? [];
+    const correctionText: string = correctionSource.generatedContent ?? "";
 
-    const userPrompt = `Voici le sujet d'examen structuré :
+    let sourceLabel = "Aucun corrigé fourni — utilise tes connaissances générales.";
+    if (correctionType === "answerKey") {
+      sourceLabel =
+        "Le professeur a fourni un CORRIGÉ TYPE (voir les images après celles de la copie). Compare strictement les réponses de l'élève à ce corrigé.";
+    } else if (correctionType === "course") {
+      sourceLabel =
+        "Le professeur a fourni un COURS DE RÉFÉRENCE (voir les images après celles de la copie). Évalue la copie selon les notions du cours.";
+    } else if (correctionType === "aiGenerated" && correctionText) {
+      sourceLabel = `CORRIGÉ TYPE VALIDÉ PAR LE PROFESSEUR :\n${correctionText}`;
+    }
+
+    // 5. Construit le contenu multi-images pour Claude
+    // deno-lint-ignore no-explicit-any
+    const content: any[] = [];
+
+    // a) Copie de l'élève
+    content.push({
+      type: "text",
+      text:
+        `Voici les ${copy.page_images.length} page(s) de la copie de l'élève "${copy.student_name}" :`,
+    });
+    for (const url of copy.page_images) {
+      content.push({ type: "image", source: { type: "url", url } });
+    }
+
+    // b) Documents du corrigé ou cours (si images fournies)
+    if (
+      (correctionType === "answerKey" || correctionType === "course") &&
+      correctionDocs.length > 0
+    ) {
+      content.push({
+        type: "text",
+        text:
+          `Voici les ${correctionDocs.length} page(s) du ${
+            correctionType === "answerKey" ? "corrigé type" : "cours"
+          } fourni par le professeur :`,
+      });
+      for (const url of correctionDocs) {
+        content.push({ type: "image", source: { type: "url", url } });
+      }
+    }
+
+    // c) Structure du sujet + instructions
+    content.push({
+      type: "text",
+      text: `Structure du sujet (barème officiel) :
 
 ${JSON.stringify(questionsForPrompt, null, 2)}
 
-Source de correction du professeur :
-${correctionSource}
+Source de correction :
+${sourceLabel}
 
-Voici l'OCR de la copie de l'élève "${copy.student_name}" :
+Note chaque leaf (question simple ou sous-question) avec son leafId exact tel que fourni.
+Retourne UNIQUEMENT le JSON, sans texte ni markdown.`,
+    });
 
-${studentText}
-
-Note chaque leaf (question simple ou sous-question) avec son leafId exact.
-Retourne UNIQUEMENT le JSON, sans texte ni markdown.`;
-
-    // 5. Correction par Claude
-    const claudeRaw = await callClaude(SYSTEM_PROMPT, userPrompt, 3072, 0.2);
+    // 6. Appelle Claude
+    const claudeRaw = await callClaude(SYSTEM_PROMPT, content, 3072, 0.15);
     const parsed = extractJson(claudeRaw);
     if (!parsed?.grades || !Array.isArray(parsed.grades)) {
       throw new Error("Format JSON invalide retourné par Claude.");
     }
 
-    // 6. Met à jour la copie
+    // 7. Met à jour la copie
     await supabase
       .from("student_copies")
       .update({
@@ -235,7 +237,7 @@ Retourne UNIQUEMENT le JSON, sans texte ni markdown.`;
       })
       .eq("id", copyId);
 
-    // 7. Remplace les notes
+    // 8. Remplace les notes
     await supabase.from("question_grades").delete().eq("copy_id", copyId);
     if (parsed.grades.length > 0) {
       // deno-lint-ignore no-explicit-any

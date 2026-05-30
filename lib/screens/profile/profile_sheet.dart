@@ -96,8 +96,13 @@ class ProfileSheet extends StatelessWidget {
                     _ActionTile(
                       icon: Icons.lock_outline,
                       iconColor: AppColors.warning,
-                      title: 'Changer le mot de passe',
-                      subtitle: 'Mot de passe actuel + nouveau',
+                      title: context.read<AuthService>().isOAuthOnlyAccount
+                          ? 'Définir un mot de passe'
+                          : 'Changer le mot de passe',
+                      subtitle:
+                          context.read<AuthService>().isOAuthOnlyAccount
+                              ? 'Permet aussi le login email/password'
+                              : 'Mot de passe actuel + nouveau',
                       onTap: () async {
                         Navigator.of(context).pop();
                         await Future.delayed(
@@ -812,9 +817,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isOAuth = context.read<AuthService>().isOAuthOnlyAccount;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Changer le mot de passe'),
+        title: Text(isOAuth
+            ? 'Définir un mot de passe'
+            : 'Changer le mot de passe'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
@@ -823,29 +831,52 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            if (isOAuth) ...[
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline, color: AppColors.primary),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Vous êtes connecté via Google. Définissez un mot de passe ici pour pouvoir aussi vous connecter avec email + mot de passe.',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+            ] else ...[
+              CustomTextField(
+                label: 'Mot de passe actuel',
+                hint: '••••••••',
+                controller: _current,
+                prefixIcon: Icons.lock_outline,
+                obscureText: true,
+                validator: (v) =>
+                    v == null || v.isEmpty ? 'Requis' : null,
+              ),
+              const SizedBox(height: 14),
+            ],
             CustomTextField(
-              label: 'Mot de passe actuel',
-              hint: '••••••••',
-              controller: _current,
-              prefixIcon: Icons.lock_outline,
-              obscureText: true,
-              validator: (v) =>
-                  v == null || v.isEmpty ? 'Requis' : null,
-            ),
-            const SizedBox(height: 14),
-            CustomTextField(
-              label: 'Nouveau mot de passe',
-              hint: 'Min. 4 caractères',
+              label: isOAuth ? 'Mot de passe' : 'Nouveau mot de passe',
+              hint: 'Min. 6 caractères',
               controller: _newPwd,
               prefixIcon: Icons.vpn_key_outlined,
               obscureText: true,
               validator: (v) =>
-                  v == null || v.length < 4 ? 'Min. 4 caractères' : null,
+                  v == null || v.length < 6 ? 'Min. 6 caractères' : null,
             ),
             const SizedBox(height: 14),
             CustomTextField(
               label: 'Confirmer',
-              hint: 'Retapez le nouveau mot de passe',
+              hint: 'Retapez le mot de passe',
               controller: _confirm,
               prefixIcon: Icons.vpn_key_outlined,
               obscureText: true,
@@ -854,7 +885,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             ),
             const SizedBox(height: 28),
             PrimaryButton(
-              label: 'Mettre à jour',
+              label: isOAuth ? 'Définir' : 'Mettre à jour',
               icon: Icons.check,
               loading: _saving,
               onPressed: _save,

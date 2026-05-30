@@ -8,7 +8,6 @@ import '../../theme/app_theme.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/google_sign_in_button.dart';
 import '../../widgets/primary_button.dart';
-import '../../widgets/social_logos.dart';
 import '../home/home_screen.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
@@ -27,7 +26,6 @@ class _LoginScreenState extends State<LoginScreen>
   final _password = TextEditingController();
   bool _loading = false;
   bool _googleLoading = false;
-  String? _socialLoading; // 'facebook', 'instagram', 'linkedin'
 
   // ===== Animations =====
   late final AnimationController _entryCtrl; // entrée des éléments
@@ -197,64 +195,16 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  Future<void> _socialSignIn(String provider) async {
-    setState(() => _socialLoading = provider);
-    try {
-      final auth = context.read<AuthService>();
-      switch (provider) {
-        case 'facebook':
-          await auth.signInWithFacebook();
-          break;
-        case 'instagram':
-          await auth.signInWithInstagram();
-          break;
-        case 'linkedin':
-          await auth.signInWithLinkedIn();
-          break;
-      }
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 380),
-          pageBuilder: (_, __, ___) => const HomeScreen(),
-          transitionsBuilder: (_, anim, __, child) =>
-              FadeTransition(opacity: anim, child: child),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$e'),
-          backgroundColor: AppColors.danger,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _socialLoading = null);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primary,
       body: Stack(
         children: [
-          // Fond animé : bulles flottantes + dégradé
-          Positioned.fill(
-            child: AnimatedBuilder(
-              animation: _bgCtrl,
-              builder: (_, __) => CustomPaint(
-                painter: _AnimatedBackgroundPainter(_bgCtrl.value),
-              ),
-            ),
-          ),
-          // Contenu — scroll au-dessus du footer blanc
+          // Contenu — scroll plein écran
           SafeArea(
-            bottom: false,
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(28, 0, 28, 160),
+              padding: const EdgeInsets.fromLTRB(28, 0, 28, 32),
               physics: const ClampingScrollPhysics(),
               child: Form(
                 key: _formKey,
@@ -502,179 +452,15 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
           ),
-          // === FOOTER BLANC ARRONDI (style CrowdFund) — connexion sociale ===
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: FadeTransition(
-              opacity: _bottomFade,
-              child: _SocialFooter(
-                loadingProvider: _socialLoading,
-                onFacebookTap: () => _socialSignIn('facebook'),
-                onInstagramTap: () => _socialSignIn('instagram'),
-                onLinkedInTap: () => _socialSignIn('linkedin'),
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
 }
 
-// =============================================================================
-// FOOTER BLANC — style CrowdFund (courbe en haut, 3 logos sociaux officiels)
-// =============================================================================
-class _SocialFooter extends StatelessWidget {
-  final String? loadingProvider;
-  final VoidCallback onFacebookTap;
-  final VoidCallback onInstagramTap;
-  final VoidCallback onLinkedInTap;
-
-  const _SocialFooter({
-    this.loadingProvider,
-    required this.onFacebookTap,
-    required this.onInstagramTap,
-    required this.onLinkedInTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(46),
-          topRight: Radius.circular(46),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x22000000),
-            blurRadius: 24,
-            offset: Offset(0, -6),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 18, 24, 14),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Ou connectez-vous avec',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _SocialButton(
-                    tooltip: 'Continuer avec Facebook',
-                    loading: loadingProvider == 'facebook',
-                    disabled: loadingProvider != null &&
-                        loadingProvider != 'facebook',
-                    onTap: onFacebookTap,
-                    logo: const FacebookLogo(size: 48),
-                  ),
-                  const SizedBox(width: 22),
-                  _SocialButton(
-                    tooltip: 'Continuer avec Instagram',
-                    loading: loadingProvider == 'instagram',
-                    disabled: loadingProvider != null &&
-                        loadingProvider != 'instagram',
-                    onTap: onInstagramTap,
-                    logo: const InstagramLogo(size: 48),
-                  ),
-                  const SizedBox(width: 22),
-                  _SocialButton(
-                    tooltip: 'Continuer avec LinkedIn',
-                    loading: loadingProvider == 'linkedin',
-                    disabled: loadingProvider != null &&
-                        loadingProvider != 'linkedin',
-                    onTap: onLinkedInTap,
-                    logo: const LinkedInLogo(size: 48),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Bouton wrapper : enveloppe le logo de marque dans un InkWell + indicateur de chargement.
-class _SocialButton extends StatelessWidget {
-  final Widget logo;
-  final String tooltip;
-  final bool loading;
-  final bool disabled;
-  final VoidCallback onTap;
-
-  const _SocialButton({
-    required this.logo,
-    required this.tooltip,
-    required this.onTap,
-    this.loading = false,
-    this.disabled = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Opacity(
-        opacity: disabled ? 0.4 : 1.0,
-        child: GestureDetector(
-          onTap: disabled || loading ? null : onTap,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              AnimatedScale(
-                scale: loading ? 0.92 : 1.0,
-                duration: const Duration(milliseconds: 200),
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.12),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: logo,
-                ),
-              ),
-              if (loading)
-                const SizedBox(
-                  width: 26,
-                  height: 26,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // =============================================================================
-// LOGO ANIMÉ — léger flottement continu
+// LOGO ANIMÉ — léger flottement continu, affiche le logo réel de l'app
 // =============================================================================
 class _AnimatedLogo extends StatelessWidget {
   final AnimationController controller;
@@ -685,44 +471,44 @@ class _AnimatedLogo extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller,
       builder: (_, __) {
-        // Léger mouvement vertical (flottement)
+        // Léger flottement vertical
         final t = controller.value * 2 * math.pi;
         final dy = math.sin(t) * 4;
-        // Rotation très subtile
-        final rot = math.sin(t * 0.5) * 0.04;
         return Transform.translate(
           offset: Offset(0, dy),
-          child: Transform.rotate(
-            angle: rot,
-            child: Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.white.withValues(alpha: 0.28),
-                    Colors.white.withValues(alpha: 0.10),
-                  ],
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.25),
+                  blurRadius: 30,
+                  offset: const Offset(0, 12),
                 ),
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.30),
-                  width: 1.5,
+                BoxShadow(
+                  color: AppColors.accent.withValues(alpha: 0.18),
+                  blurRadius: 40,
+                  offset: const Offset(0, 4),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.accent.withValues(alpha: 0.30),
-                    blurRadius: 30,
-                    offset: const Offset(0, 8),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: Image.asset(
+                'assets/icon/app_icon.png',
+                width: 120,
+                height: 120,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 120,
+                  height: 120,
+                  color: Colors.white,
+                  child: const Icon(
+                    Icons.auto_awesome,
+                    size: 52,
+                    color: AppColors.primary,
                   ),
-                ],
-              ),
-              child: const Icon(
-                Icons.auto_awesome,
-                size: 52,
-                color: Colors.white,
+                ),
               ),
             ),
           ),
@@ -732,78 +518,3 @@ class _AnimatedLogo extends StatelessWidget {
   }
 }
 
-// =============================================================================
-// FOND ANIMÉ — formes flottantes + dégradé
-// =============================================================================
-class _AnimatedBackgroundPainter extends CustomPainter {
-  final double t; // 0..1
-  _AnimatedBackgroundPainter(this.t);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Dégradé vertical sombre → primary
-    final bg = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          AppColors.primaryDark,
-          AppColors.primary,
-          AppColors.primaryLight,
-        ],
-        stops: [0, 0.55, 1],
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bg);
-
-    // Cercles flottants en arrière-plan
-    _drawBubble(canvas, size,
-        cx: 0.15, cy: 0.20, baseR: 80, phase: 0, opacity: 0.10);
-    _drawBubble(canvas, size,
-        cx: 0.85, cy: 0.30, baseR: 110, phase: 0.3, opacity: 0.08);
-    _drawBubble(canvas, size,
-        cx: 0.20, cy: 0.75, baseR: 95, phase: 0.6, opacity: 0.07);
-    _drawBubble(canvas, size,
-        cx: 0.78, cy: 0.85, baseR: 130, phase: 0.85, opacity: 0.06);
-    _drawBubble(canvas, size,
-        cx: 0.50, cy: 0.50, baseR: 70, phase: 0.45, opacity: 0.05);
-
-    // Cercle accent (cyan) qui se déplace en oblique
-    final accentT = (t + 0.2) % 1.0;
-    final ax = size.width * (0.2 + 0.6 * accentT);
-    final ay = size.height * (0.85 - 0.6 * accentT);
-    canvas.drawCircle(
-      Offset(ax, ay),
-      90,
-      Paint()
-        ..color = AppColors.accent.withValues(alpha: 0.10)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 40),
-    );
-  }
-
-  void _drawBubble(
-    Canvas canvas,
-    Size size, {
-    required double cx,
-    required double cy,
-    required double baseR,
-    required double phase,
-    required double opacity,
-  }) {
-    final tt = (t + phase) * 2 * math.pi;
-    final dx = math.sin(tt) * 18;
-    final dy = math.cos(tt * 0.8) * 12;
-    final r = baseR + math.sin(tt * 0.6) * 8;
-    final p = Paint()
-      ..color = Colors.white.withValues(alpha: opacity)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 24);
-    canvas.drawCircle(
-      Offset(size.width * cx + dx, size.height * cy + dy),
-      r,
-      p,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _AnimatedBackgroundPainter oldDelegate) =>
-      oldDelegate.t != t;
-}

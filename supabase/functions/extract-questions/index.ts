@@ -1,14 +1,12 @@
 // =============================================================================
-// Edge Function : extract-questions  (VERSION AUTONOME)
+// Edge Function : extract-questions  (Claude Vision uniquement)
 // Input  : { imageUrls: string[], language?: string, examType?: string }
-// Output : { questions: [...], rawOcr: string }
+// Output : { questions: [...] }
 //
-// Pipeline : Google Cloud Vision OCR  →  Claude Haiku (structuration JSON)
-//
-// Déployable par copier-coller dans le dashboard Supabase (aucun import local).
+// Claude voit les images du sujet et retourne directement la structure JSON.
+// Aucune dépendance à Google Vision.
 // =============================================================================
 
-// --- CORS --------------------------------------------------------------------
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -16,57 +14,27 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// --- Secrets (configurés dans Supabase → Edge Functions → Secrets) ----------
-const VISION_API_KEY = Deno.env.get("GOOGLE_VISION_API_KEY") ?? "";
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const CLAUDE_MODEL = Deno.env.get("CLAUDE_MODEL") ?? "claude-haiku-4-5-20251001";
 
-// --- Google Cloud Vision : OCR d'une image ----------------------------------
-async function ocrImageFromUrl(imageUrl: string): Promise<string> {
-  if (!VISION_API_KEY) {
-    throw new Error("GOOGLE_VISION_API_KEY manquant (Supabase secrets).");
-  }
-  const endpoint =
-    `https://vision.googleapis.com/v1/images:annotate?key=${VISION_API_KEY}`;
-  const body = {
-    requests: [
-      {
-        image: { source: { imageUri: imageUrl } },
-        features: [{ type: "DOCUMENT_TEXT_DETECTION", maxResults: 1 }],
-        imageContext: { languageHints: ["fr", "en", "ar"] },
-      },
-    ],
-  };
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    throw new Error(`Vision API ${res.status}: ${await res.text()}`);
-  }
-  const data = await res.json();
-  return data?.responses?.[0]?.fullTextAnnotation?.text ?? "";
-}
-
-async function ocrMultipleImages(urls: string[]): Promise<string> {
-  const texts: string[] = [];
-  for (let i = 0; i < urls.length; i++) {
-    texts.push(`--- PAGE ${i + 1} ---\n${await ocrImageFromUrl(urls[i])}`);
-  }
-  return texts.join("\n\n");
-}
-
-// --- Anthropic Claude --------------------------------------------------------
-async function callClaude(
-  system: string,
-  user: string,
+// deno-lint-ignore no-explicit-any
+async function callClaudeWithImages(
+  systemPrompt: string,
+  userPrompt: string,
+  imageUrls: string[],
   maxTokens = 4096,
   temperature = 0.1,
 ): Promise<string> {
   if (!ANTHROPIC_API_KEY) {
     throw new Error("ANTHROPIC_API_KEY manquant (Supabase secrets).");
   }
+  // deno-lint-ignore no-explicit-any
+  const content: any[] = imageUrls.map((url) => ({
+    type: "image",
+    source: { type: "url", url },
+  }));
+  content.push({ type: "text", text: userPrompt });
+
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -78,8 +46,8 @@ async function callClaude(
       model: CLAUDE_MODEL,
       max_tokens: maxTokens,
       temperature,
-      system,
-      messages: [{ role: "user", content: user }],
+      system: systemPrompt,
+      messages: [{ role: "user", content }],
     }),
   });
   if (!res.ok) {
@@ -104,19 +72,18 @@ function extractJson(rawText: string): any {
   }
 }
 
-// --- Prompt système ----------------------------------------------------------
-const SYSTEM_PROMPT =
-  `Tu es un assistant pédagogique spécialisé dans l'analyse de sujets d'examen.
-Ton rôle : transformer du texte brut (issu de l'OCR d'un sujet d'examen) en structure JSON propre.
+const SYSTEM_PROMPT = `Tu es un assistant pédagogique expert en analyse de sujets d'examen.
+Tu examines les photos d'un sujet d'examen et en extrais la structure complète en JSON.
 
 Règles ABSOLUES :
-- Conserve EXACTEMENT le texte de l'énoncé (équations, symboles, formules) — ne reformule pas
-- Détecte les exercices et leurs sous-questions (a, b, c, 1°, 2°, etc.)
-- Extrais les barèmes : "/2", "(3 pts)", "sur 4", etc.
-- Si un exercice n'a pas de barème explicite, mets points = 0
-- Sortie : UNIQUEMENT du JSON valide, AUCUN texte autour, AUCUN markdown
+- Lis attentivement le texte des images (imprimé OU manuscrit)
+- Conserve EXACTEMENT le texte de chaque énoncé : équations, symboles, formules, données chiffrées
+- Détecte les exercices (Exercice 1, Question 1, etc.) et leurs sous-questions (a, b, c, 1°, 2°…)
+- Extrais les barèmes : "/2", "(3 pts)", "sur 4", "5 points", etc.
+- Si pas de barème explicite pour un exercice : mets points = 0
+- Sortie : UNIQUEMENT du JSON valide, AUCUN texte ni markdown autour
 
-Format JSON attendu :
+Format JSON :
 {
   "questions": [
     {
@@ -130,14 +97,13 @@ Format JSON attendu :
     },
     {
       "label": "Question 2",
-      "statement": "Énoncé d'une question simple",
+      "statement": "Énoncé simple",
       "points": 3,
       "subQuestions": []
     }
   ]
 }`;
 
-// --- Handler -----------------------------------------------------------------
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -155,29 +121,27 @@ Deno.serve(async (req: Request): Promise<Response> => {
       throw new Error("imageUrls est requis (au moins 1 URL).");
     }
 
-    const rawOcr = await ocrMultipleImages(imageUrls);
-    if (!rawOcr.trim()) throw new Error("Aucun texte détecté sur les images.");
-
     const userPrompt =
       `Langue de l'examen : ${body.language ?? "fr"}
 Type d'examen : ${body.examType ?? "general"}
 
-Texte OCR du sujet (peut contenir des erreurs de reconnaissance) :
+Regarde les ${imageUrls.length} page(s) du sujet ci-dessus et retourne UNIQUEMENT le JSON structuré.`;
 
-${rawOcr}
-
-Retourne UNIQUEMENT le JSON structuré, sans texte ni markdown autour.`;
-
-    const claudeRaw = await callClaude(SYSTEM_PROMPT, userPrompt, 4096, 0.1);
+    const claudeRaw = await callClaudeWithImages(
+      SYSTEM_PROMPT,
+      userPrompt,
+      imageUrls,
+      4096,
+      0.1,
+    );
     const parsed = extractJson(claudeRaw);
     if (!parsed?.questions || !Array.isArray(parsed.questions)) {
       throw new Error("Format JSON invalide retourné par Claude.");
     }
 
-    return new Response(
-      JSON.stringify({ questions: parsed.questions, rawOcr }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ questions: parsed.questions }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return new Response(JSON.stringify({ error: message }), {

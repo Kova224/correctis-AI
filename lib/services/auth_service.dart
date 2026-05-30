@@ -240,7 +240,25 @@ class AuthService extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------------------
-  // Changement de mot de passe (utilisateur connecté)
+  // Détection : ce compte a-t-il été créé via OAuth uniquement (pas de password) ?
+  // ---------------------------------------------------------------------------
+  bool get isOAuthOnlyAccount {
+    final user = _client.auth.currentUser;
+    if (user == null) return false;
+    final provider = user.appMetadata['provider'] as String?;
+    final providers =
+        (user.appMetadata['providers'] as List<dynamic>?)?.cast<String>() ??
+            const [];
+    if (provider == null) return false;
+    if (provider == 'email') return false;
+    return !providers.contains('email');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Changement ou définition de mot de passe (utilisateur connecté)
+  //
+  // - Compte email/password : `currentPassword` requis et vérifié
+  // - Compte OAuth (Google...) : `currentPassword` ignoré, on définit directement
   // ---------------------------------------------------------------------------
   Future<void> changePassword({
     required String currentPassword,
@@ -250,15 +268,19 @@ class AuthService extends ChangeNotifier {
     if (newPassword.length < 6) {
       throw 'Mot de passe trop court (min. 6 caractères).';
     }
-    // Vérifie le mot de passe actuel en se reconnectant
-    try {
-      await _client.auth.signInWithPassword(
-        email: _currentUser!.email,
-        password: currentPassword,
-      );
-    } on sb.AuthException {
-      throw 'Mot de passe actuel incorrect.';
+
+    // Saute la vérification du mot de passe actuel si compte OAuth
+    if (!isOAuthOnlyAccount) {
+      try {
+        await _client.auth.signInWithPassword(
+          email: _currentUser!.email,
+          password: currentPassword,
+        );
+      } on sb.AuthException {
+        throw 'Mot de passe actuel incorrect.';
+      }
     }
+
     try {
       await _client.auth.updateUser(
         sb.UserAttributes(password: newPassword),
@@ -291,39 +313,51 @@ class AuthService extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------------------
-  // OAuth — Google / Facebook / LinkedIn (Supabase OAuth)
+  // OAuth — Google uniquement
+  // Ouvre le navigateur, attend le retour via deep-link correctis://login-callback,
+  // puis attend l'événement SIGNED_IN avant de retourner l'utilisateur.
   // ---------------------------------------------------------------------------
-  Future<AppUser> signInWithGoogle() => _signInWithOAuth(sb.OAuthProvider.google);
-  Future<AppUser> signInWithFacebook() =>
-      _signInWithOAuth(sb.OAuthProvider.facebook);
-  Future<AppUser> signInWithLinkedIn() =>
-      _signInWithOAuth(sb.OAuthProvider.linkedinOidc);
-
-  /// Instagram n'est pas un provider Supabase natif — pour le démo,
-  /// on bascule sur LinkedIn ou on indique "bientôt disponible".
-  Future<AppUser> signInWithInstagram() async {
-    throw 'Connexion Instagram bientôt disponible. Utilisez Google ou Facebook.';
-  }
+  Future<AppUser> signInWithGoogle() =>
+      _signInWithOAuth(sb.OAuthProvider.google);
 
   Future<AppUser> _signInWithOAuth(sb.OAuthProvider provider) async {
+    // 1. Souscrit au prochain événement SIGNED_IN AVANT de lancer le flow OAuth
+    final completer = Completer<void>();
+    late StreamSubscription<sb.AuthState> sub;
+    sub = _client.auth.onAuthStateChange.listen((state) {
+      if (state.event == sb.AuthChangeEvent.signedIn) {
+        if (!completer.isCompleted) completer.complete();
+      }
+    });
+
     try {
-      await _client.auth.signInWithOAuth(
+      // 2. Lance le flow OAuth (ouvre le navigateur système)
+      final ok = await _client.auth.signInWithOAuth(
         provider,
         redirectTo: 'correctis://login-callback',
       );
-      // La méthode revient avant la fin du flow OAuth (qui se passe en webview).
-      // On attend que onAuthStateChange déclenche le sync.
-      await Future.delayed(const Duration(seconds: 1));
-      // Si pas encore connecté, on lance un sync silencieux.
+      if (!ok) {
+        throw 'Impossible d\'ouvrir la page de connexion Google.';
+      }
+
+      // 3. Attend que l'utilisateur termine le flow OAuth dans le navigateur
+      //    (max 2 min, sinon timeout)
+      await completer.future.timeout(
+        const Duration(minutes: 2),
+        onTimeout: () =>
+            throw 'Délai dépassé pour la connexion Google. Réessayez.',
+      );
+
+      // 4. Charge le profil
       await _syncFromSupabase();
       if (_currentUser == null) {
-        throw 'La connexion OAuth a été annulée ou n\'a pas abouti.';
+        throw 'Connexion Google incomplète. Réessayez.';
       }
       return _currentUser!;
     } on sb.AuthException catch (e) {
       throw _translateAuth(e.message);
-    } catch (e) {
-      throw '$e';
+    } finally {
+      await sub.cancel();
     }
   }
 

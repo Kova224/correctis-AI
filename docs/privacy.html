@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Politique de confidentialité — Correctis</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 760px;
+    margin: 40px auto;
+    padding: 0 20px;
+    color: #1a1f36;
+    line-height: 1.6;
+  }
+  h1 { color: #2E4BC7; }
+  h2 { color: #2E4BC7; margin-top: 32px; }
+  a { color: #2E4BC7; }
+  .meta { color: #6b7280; font-size: 14px; margin-bottom: 32px; }
+  footer { margin-top: 60px; color: #6b7280; font-size: 13px; border-top: 1px solid #e5e7eb; padding-top: 16px; }
+</style>
+</head>
+<body>
+
+<h1>Politique de confidentialité — Correctis</h1>
+<p class="meta">Dernière mise à jour : 16 mai 2026</p>
+
+<p>
+Correctis (« nous », « notre », « l'application ») est une application mobile
+destinée aux enseignants pour automatiser la correction des copies d'élèves
+grâce à l'intelligence artificielle. La présente politique décrit comment
+nous collectons, utilisons, stockons et protégeons vos données personnelles.
+</p>
+
+<h2>1. Données collectées</h2>
+<p>Lorsque vous utilisez Correctis, nous collectons :</p>
+<ul>
+  <li><strong>Données de compte</strong> : adresse email, nom d'affichage, mot de passe (haché), photo de profil (optionnelle), téléphone (optionnel), nom de l'établissement (optionnel).</li>
+  <li><strong>Données pédagogiques</strong> : titres et contenus des examens créés, photos des sujets d'examen, photos des copies des élèves, notes, commentaires, classements.</li>
+  <li><strong>Données d'identification des élèves</strong> : nom et numéro de référence (PV) saisis par l'enseignant.</li>
+  <li><strong>Données techniques</strong> : informations sur l'appareil utilisé (modèle, OS), logs d'erreur anonymisés.</li>
+</ul>
+
+<h2>2. Comment nous utilisons vos données</h2>
+<ul>
+  <li>Pour authentifier votre compte et personnaliser votre expérience.</li>
+  <li>Pour analyser les photos de sujets et copies via notre service d'IA (Anthropic Claude) afin de proposer une correction automatique.</li>
+  <li>Pour stocker vos examens et copies de manière à les retrouver à votre prochaine connexion.</li>
+  <li>Pour générer des rapports (classements, exports Excel).</li>
+  <li>Pour améliorer le service via des statistiques d'usage anonymisées.</li>
+</ul>
+
+<h2>3. Hébergement et sous-traitants</h2>
+<p>Vos données sont hébergées et traitées par les fournisseurs suivants :</p>
+<ul>
+  <li><strong>Supabase</strong> (base de données PostgreSQL + stockage de fichiers) — serveurs en Europe. <a href="https://supabase.com/privacy" target="_blank">Politique Supabase</a></li>
+  <li><strong>Anthropic</strong> (modèle Claude pour l'analyse IA) — les photos de copies et sujets sont envoyées à l'API Anthropic pour la correction automatique. Anthropic ne conserve pas ces données pour entraîner ses modèles (politique « zero-retention » par défaut). <a href="https://www.anthropic.com/legal/privacy" target="_blank">Politique Anthropic</a></li>
+  <li><strong>Google Cloud</strong> (services Google authentification si vous choisissez la connexion via Google).</li>
+</ul>
+
+<h2>4. Sécurité des données</h2>
+<ul>
+  <li>Les mots de passe sont stockés sous forme hachée (bcrypt) et ne sont jamais transmis en clair.</li>
+  <li>Les connexions à nos services se font exclusivement via HTTPS chiffré.</li>
+  <li>Chaque enseignant n'accède qu'à ses propres données (Row Level Security au niveau de la base de données).</li>
+  <li>Les photos sont stockées dans des dossiers individuels accessibles uniquement à l'enseignant propriétaire.</li>
+</ul>
+
+<h2>5. Caméra et galerie</h2>
+<p>
+Correctis demande l'accès à la caméra et à la galerie de votre téléphone
+uniquement pour vous permettre de prendre en photo des sujets d'examen et des
+copies d'élèves. Les images ne sont jamais utilisées à d'autres fins et ne
+sont accessibles qu'à vous via votre compte.
+</p>
+
+<h2>6. Vos droits (RGPD)</h2>
+<p>Conformément au RGPD et aux lois équivalentes, vous disposez à tout moment des droits suivants :</p>
+<ul>
+  <li><strong>Accès</strong> — voir l'intégralité des données que nous détenons sur vous.</li>
+  <li><strong>Rectification</strong> — corriger toute information inexacte.</li>
+  <li><strong>Suppression</strong> — demander l'effacement complet de votre compte et des données associées.</li>
+  <li><strong>Portabilité</strong> — recevoir une copie de vos données dans un format ouvert.</li>
+  <li><strong>Opposition</strong> — vous opposer au traitement de vos données.</li>
+</ul>
+<p>Pour exercer ces droits, contactez-nous à : <a href="mailto:support@correctis.app">support@correctis.app</a></p>
+
+<h2>7. Conservation des données</h2>
+<p>
+Vos données sont conservées tant que votre compte est actif. Si vous supprimez
+votre compte (depuis l'app ou par demande à <a href="mailto:support@correctis.app">support@correctis.app</a>),
+toutes vos données sont définitivement effacées sous 30 jours.
+</p>
+
+<h2>8. Mineurs</h2>
+<p>
+Correctis s'adresse aux enseignants adultes. Les données scannées concernent
+le travail d'élèves (potentiellement mineurs), mais seules les informations
+strictement pédagogiques (nom, copies, notes) sont collectées, sous la
+responsabilité de l'enseignant et conformément aux règles de l'établissement
+scolaire concerné.
+</p>
+
+<h2>9. Cookies et traceurs</h2>
+<p>
+L'application Correctis n'utilise aucun cookie publicitaire ni traceur tiers.
+Seuls des cookies techniques nécessaires à l'authentification sont utilisés.
+</p>
+
+<h2>10. Modifications</h2>
+<p>
+Nous pouvons mettre à jour cette politique de confidentialité. La date en
+haut de cette page reflète la dernière modification. Les utilisateurs seront
+informés des changements significatifs par notification dans l'application.
+</p>
+
+<h2>11. Contact</h2>
+<p>Pour toute question concernant cette politique ou vos données personnelles :</p>
+<ul>
+  <li>Email : <a href="mailto:support@correctis.app">support@correctis.app</a></li>
+</ul>
+
+<footer>
+© 2026 Correctis — Politique de confidentialité v1.0
+</footer>
+
+</body>
+</html>
