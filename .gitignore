@@ -88,3 +88,6 @@ firebase-debug.log
 supabase/.branches/
 supabase/.temp/
 .supabase/
+
+# Assets pour la soumission Play Store (captures, feature graphic, etc.)
+play-store-assets/
