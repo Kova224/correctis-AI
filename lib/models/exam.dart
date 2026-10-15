@@ -49,6 +49,29 @@ enum ExamType {
       );
 }
 
+/// Type de contrôle (DS, Examen, Bac blanc, etc.) — utilisé par l'admin
+/// pour ranger les notes dans le casier.
+enum ControlType {
+  general('general', 'Général', '📋'),
+  ds('ds', 'Devoir surveillé', '📝'),
+  examen('examen', 'Examen', '🎯'),
+  bacBlanc('bac_blanc', 'Bac blanc', '🎓'),
+  oral('oral', 'Oral', '🗣️'),
+  devoirMaison('devoir_maison', 'Devoir maison', '🏠'),
+  controleContinu('controle_continu', 'Contrôle continu', '📊');
+
+  final String code;
+  final String label;
+  final String emoji;
+  const ControlType(this.code, this.label, this.emoji);
+
+  static ControlType fromCode(String? code) =>
+      ControlType.values.firstWhere(
+        (t) => t.code == code,
+        orElse: () => ControlType.general,
+      );
+}
+
 class Exam {
   final String id;
   final String ownerId;
@@ -57,6 +80,13 @@ class Exam {
   double totalPoints;
   ExamLanguage language;
   ExamType examType;
+  /// Type de contrôle (DS / Examen / Bac blanc...). Sert au casier admin
+  /// pour ranger les notes par catégorie.
+  ControlType controlType;
+  /// École à laquelle est rattaché cet examen (null = examen prof solo).
+  /// Quand le prof envoie ses notes au casier, elles vont dans le casier
+  /// de cette école.
+  String? establishmentId;
   List<String> subjectImages; // pages du sujet importé
   List<Question> questions;
   bool subjectValidated;
@@ -72,6 +102,8 @@ class Exam {
     this.totalPoints = 20,
     this.language = ExamLanguage.french,
     this.examType = ExamType.general,
+    this.controlType = ControlType.general,
+    this.establishmentId,
     List<String>? subjectImages,
     List<Question>? questions,
     this.subjectValidated = false,

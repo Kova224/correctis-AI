@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acheter des crédits | Correctis</title>
+  <meta name="description" content="Achetez des crédits de correction Correctis par Mobile Money ou carte bancaire.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="../assets/favicon-48.png" type="image/png" sizes="48x48">
+  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+  <script>document.documentElement.classList.add('js')</script>
+  <link rel="stylesheet" href="../assets/site.css">
+  <link rel="stylesheet" href="../assets/motion.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-head">
+    <div class="wrap">
+      <a class="logo" href="../"><img src="../assets/logo-mark.png" alt="" width="40" height="40">Correctis</a>
+      <div id="account" class="account" hidden>
+        <span id="account-email"></span>
+        <button id="logout" class="link" type="button">Se déconnecter</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="shop">
+    <!-- Chargement -->
+    <section id="view-loading" class="view">
+      <div class="spinner" aria-label="Chargement"></div>
+    </section>
+
+    <!-- Connexion -->
+    <section id="view-login" class="view" hidden>
+      <h1>Acheter des crédits</h1>
+      <p class="muted">Connectez-vous avec le compte que vous utilisez dans l'application Correctis.</p>
+      <form id="login-form" class="card" novalidate>
+        <label for="login-email">Adresse e-mail</label>
+        <input id="login-email" type="email" autocomplete="email" required>
+        <label for="login-password">Mot de passe</label>
+        <input id="login-password" type="password" autocomplete="current-password" required>
+        <p id="login-error" class="error" hidden></p>
+        <button id="login-submit" class="btn primary" type="submit">Se connecter</button>
+        <button id="login-forgot" class="link small" type="button">Mot de passe oublié ?</button>
+      </form>
+      <div class="or"><span>ou</span></div>
+      <button id="login-google" class="btn outline" type="button">Continuer avec Google</button>
+      <p class="muted small center">Pas encore de compte ? Créez-le dans l'application Correctis, puis revenez ici.</p>
+    </section>
+
+    <!-- Boutique -->
+    <section id="view-shop" class="view" hidden>
+      <h1>Acheter des crédits</h1>
+      <p class="muted">1 crédit = 1 copie corrigée jusqu'à 8 pages. Les crédits sont ajoutés à votre compte dès que le paiement est confirmé.</p>
+
+      <div id="no-target" class="card notice" hidden>
+        Créez d'abord votre école dans l'application Correctis : les packs établissement seront ensuite disponibles ici.
+      </div>
+
+      <!-- 1. Pays -->
+      <div class="card step" id="step-country">
+        <div class="step-title"><span class="num">1</span> Pays de facturation</div>
+        <div id="country-fixed" hidden>
+          <p class="country-line"><strong id="country-name"></strong> · prix en <span id="country-currency"></span></p>
+          <button id="country-change" class="link small" type="button" hidden>Changer de pays</button>
+          <p id="country-locked" class="muted small" hidden>Le pays ne peut plus être changé après un premier paiement.</p>
+        </div>
+        <div id="country-pick" hidden>
+          <p class="muted small">Il fixe la devise de votre compte (FCFA ou franc guinéen). Vous pourrez le changer jusqu'à votre premier paiement.</p>
+          <select id="country-select" aria-label="Pays"></select>
+          <button id="country-save" class="btn primary" type="button">Valider le pays</button>
+        </div>
+      </div>
+
+      <!-- 2. Pack -->
+      <div class="card step" id="step-pack" hidden>
+        <div class="step-title"><span class="num">2</span> Choisissez un pack</div>
+        <div id="target-switch" class="segmented" role="tablist" hidden>
+          <button type="button" data-target="user" role="tab">Pour moi</button>
+          <button type="button" data-target="establishment" role="tab">Pour mon école</button>
+        </div>
+        <div id="school-pick" hidden>
+          <label for="school-select">École</label>
+          <select id="school-select"></select>
+        </div>
+        <div id="packs" class="packs"></div>
+      </div>
+
+      <!-- 3. Paiement -->
+      <div class="card step" id="step-pay" hidden>
+        <div class="step-title"><span class="num">3</span> Paiement</div>
+        <div id="methods" class="methods" role="radiogroup" aria-label="Moyen de paiement"></div>
+        <p id="card-note" class="muted small" hidden>Le paiement par carte bancaire arrive bientôt : utilisez Mobile Money.</p>
+        <label for="phone" id="phone-label">Numéro de téléphone du compte de paiement</label>
+        <div class="phone">
+          <span id="phone-prefix">+224</span>
+          <input id="phone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="Numéro">
+        </div>
+        <p id="phone-hint" class="muted small">Vous recevrez la demande de confirmation sur ce numéro.</p>
+        <p id="pay-error" class="error" hidden></p>
+        <button id="pay" class="btn primary big" type="button" disabled>Payer</button>
+        <p class="muted small center">Paiement sécurisé par CinetPay. Vous serez redirigé vers leur page de paiement.</p>
+      </div>
+    </section>
+
+    <!-- Retour de CinetPay -->
+    <section id="view-return" class="view" hidden>
+      <div class="card result">
+        <div id="result-icon" class="result-icon pending"></div>
+        <h1 id="result-title">Vérification du paiement…</h1>
+        <p id="result-text" class="muted">Nous attendons la confirmation de CinetPay. Cela prend en général moins d'une minute.</p>
+        <div id="result-actions" class="actions"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-foot">
+    <div class="wrap">
+      <p class="muted">Une question sur un paiement ? <a id="support-link" href="mailto:support@correctis.app">support@correctis.app</a></p>
+      <nav aria-label="Liens du site">
+        <a href="../">Accueil</a>
+        <a href="../#tarifs">Tarifs</a>
+        <a href="../confidentialite.html">Confidentialité</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script src="vendor/supabase-2.117.0.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script src="../assets/motion.js"></script>
+</body>
+</html>

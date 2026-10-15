@@ -137,6 +137,27 @@ class ChatBotService extends ChangeNotifier {
     }
 
     // Création d'examen
+    // Crédits (grille v5). Option B : l'achat se fait hors de l'app — règle
+    // Google Play : ni prix, ni bouton, ni lien d'achat dans l'app.
+    if (_match(t, ['credit', 'prix', 'tarif', 'payer', 'paiement', 'pack',
+        'combien', 'coute', 'abonnement', 'acheter', 'recharger'])) {
+      return const _BotResponse(
+        '🪙 **Crédits :**\n'
+        '• 1 crédit = 1 copie corrigée par l\'IA, jusqu\'à 8 pages\n'
+        '• Copie plus longue : 9–17 pages = 2 crédits, 18–25 = 3, 26–34 = 4…\n'
+        '• 3 copies offertes à l\'inscription (pack Découverte)\n'
+        '• Le scan est gratuit : seul « Lancer la correction » débite\n'
+        '• En cas d\'échec technique, les crédits sont remis en solde\n'
+        '• Chaque lot de crédits a une date d\'expiration\n\n'
+        'Votre solde, vos lots et l\'historique sont dans '
+        '**Profil → Mes crédits**.',
+        suggestions: [
+          'Comment scanner les copies ?',
+          'Créer un examen',
+        ],
+      );
+    }
+
     if (_match(t, ['creer', 'cree', 'nouveau', 'ajouter']) &&
         _match(t, ['examen', 'evaluation', 'devoir', 'controle', 'exam'])) {
       return const _BotResponse(

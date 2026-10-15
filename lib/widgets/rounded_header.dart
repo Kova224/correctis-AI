@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-/// Header bleu arrondi (style CrowdFund) — coins arrondis en bas.
-/// Hauteur = `height` (au-dessus du status bar). La hauteur totale rendue
-/// inclut automatiquement le status bar (SafeArea).
+/// Header sobre dark mode — V2 selon maquette Michel.
+///
+/// Anciennement bandeau bleu vif arrondi. Devient : fond void avec un léger
+/// dégradé radial bleu en haut (style maquette), bordure inférieure subtile.
+/// Pas d'arrondi exagéré — la maquette utilise des transitions discrètes.
 class RoundedHeader extends StatelessWidget {
   final Widget child;
   final double height;
@@ -13,33 +15,50 @@ class RoundedHeader extends StatelessWidget {
   final VoidCallback? onBack;
   final List<Widget>? actions;
 
+  /// Accent du dégradé (par défaut bleu primary).
+  /// Permet de teinter les headers selon le contexte (vert pour prof, violet
+  /// pour admin, etc.).
+  final Color? accentColor;
+
   const RoundedHeader({
     super.key,
     required this.child,
-    this.height = 220,
+    this.height = 200,
     this.contentPadding = const EdgeInsets.fromLTRB(20, 4, 20, 20),
     this.showBackButton = false,
     this.onBack,
     this.actions,
+    this.accentColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final topInset = MediaQuery.of(context).padding.top;
+    final accent = accentColor ?? AppColors.primary;
+
     return Container(
       width: double.infinity,
       height: height + topInset,
-      decoration: const BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(40),
-          bottomRight: Radius.circular(40),
+      decoration: BoxDecoration(
+        // Dégradé radial subtil — la maquette utilise ce pattern pour
+        // donner du relief sans bandeau coloré agressif.
+        gradient: RadialGradient(
+          center: const Alignment(0, -1.2),
+          radius: 1.5,
+          colors: [
+            accent.withValues(alpha: 0.15),
+            AppColors.voidBg,
+          ],
+          stops: const [0.0, 0.7],
+        ),
+        // Bordure inférieure subtile pour séparer du contenu
+        border: const Border(
+          bottom: BorderSide(color: AppColors.borderSubtle, width: 1),
         ),
       ),
       padding: EdgeInsets.only(top: topInset),
       child: Column(
         children: [
-          // Barre du haut — flèche retour à gauche, actions à droite
           SizedBox(
             height: 48,
             child: Padding(
@@ -64,7 +83,6 @@ class RoundedHeader extends StatelessWidget {
               ),
             ),
           ),
-          // Contenu principal — pleine hauteur disponible (bornée)
           Expanded(
             child: Padding(
               padding: contentPadding,
@@ -77,7 +95,7 @@ class RoundedHeader extends StatelessWidget {
   }
 }
 
-/// Bouton circulaire semi-transparent — pour la flèche retour et autres actions.
+/// Bouton circulaire subtil — fond card avec bordure très discrète.
 class _CircleIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onPressed;
@@ -92,8 +110,10 @@ class _CircleIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white.withValues(alpha: 0.18),
-      shape: const CircleBorder(),
+      color: AppColors.card,
+      shape: const CircleBorder(
+        side: BorderSide(color: AppColors.borderSubtle, width: 1),
+      ),
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onPressed,
@@ -102,8 +122,8 @@ class _CircleIconButton extends StatelessWidget {
           height: 40,
           child: Icon(
             icon,
-            color: iconColor ?? Colors.white,
-            size: 18,
+            color: iconColor ?? AppColors.textPrimary,
+            size: 16,
           ),
         ),
       ),
@@ -111,7 +131,7 @@ class _CircleIconButton extends StatelessWidget {
   }
 }
 
-/// Bouton circulaire utilitaire (utilisable depuis les `actions:` du header).
+/// Bouton circulaire utilitaire — pour les actions du header.
 class HeaderCircleAction extends StatelessWidget {
   final IconData icon;
   final VoidCallback onPressed;
@@ -129,15 +149,18 @@ class HeaderCircleAction extends StatelessWidget {
     final btn = Padding(
       padding: const EdgeInsets.only(left: 8),
       child: Material(
-        color: Colors.white.withValues(alpha: 0.18),
-        shape: const CircleBorder(),
+        color: AppColors.card,
+        shape: const CircleBorder(
+          side: BorderSide(color: AppColors.borderSubtle, width: 1),
+        ),
         child: InkWell(
           customBorder: const CircleBorder(),
           onTap: onPressed,
           child: SizedBox(
             width: 40,
             height: 40,
-            child: Icon(icon, color: Colors.white, size: 18),
+            child:
+                Icon(icon, color: AppColors.textPrimary, size: 16),
           ),
         ),
       ),

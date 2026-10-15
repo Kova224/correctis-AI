@@ -1,0 +1,36 @@
+# =============================================================================
+# Proxy CinetPay — Correctis (HTTPS)
+# =============================================================================
+# Pourquoi : CinetPay n'accepte que des IP fixes whitelistées ; les Edge
+# Functions Supabase n'en ont pas. Ce VPS relaie donc les appels vers
+# api.cinetpay.net. Depuis l'audit du 15/10/2026 il DOIT être en HTTPS : la
+# clé et le mot de passe API CinetPay passent par lui.
+#
+# Variables d'environnement (fichier /etc/caddy/correctis.env, chmod 600) :
+#   PROXY_DOMAIN  = cinetpay-proxy.correctis.app   (enregistrement DNS A → IP du VPS)
+#   PROXY_SECRET  = <même valeur que le secret Supabase CINETPAY_PROXY_SECRET>
+#
+# Caddy obtient et renouvelle seul le certificat Let's Encrypt (ports 80 et
+# 443 ouverts sur le VPS). L'IP reste la même : rien à changer chez CinetPay.
+# =============================================================================
+
+{$PROXY_DOMAIN} {
+	# Refuse tout appel qui n'a pas le secret partagé avec les Edge Functions
+	@authorized header X-Correctis-Proxy {$PROXY_SECRET}
+
+	handle @authorized {
+		reverse_proxy https://api.cinetpay.net {
+			header_up Host api.cinetpay.net
+			header_up -X-Correctis-Proxy
+		}
+	}
+
+	handle {
+		respond "Forbidden" 403
+	}
+
+	log {
+		output file /var/log/caddy/cinetpay-proxy.log
+		format json
+	}
+}

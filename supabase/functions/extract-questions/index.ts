@@ -14,7 +14,13 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+// Audit 15/10/2026 : plafond d'images par appel (coût Claude).
+const MAX_SUBJECT_IMAGES = 20;
 const CLAUDE_MODEL = Deno.env.get("CLAUDE_MODEL") ?? "claude-haiku-4-5-20251001";
 
 // deno-lint-ignore no-explicit-any
@@ -62,14 +68,47 @@ function extractJson(rawText: string): any {
   const trimmed = rawText.trim();
   try {
     return JSON.parse(trimmed);
-  } catch (_) {
-    const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (fence) return JSON.parse(fence[1].trim());
-    const s = trimmed.indexOf("{");
-    const e = trimmed.lastIndexOf("}");
-    if (s >= 0 && e > s) return JSON.parse(trimmed.substring(s, e + 1));
-    throw new Error(`Réponse non-JSON: ${trimmed.substring(0, 200)}`);
+  } catch (_) { /* fallback */ }
+
+  const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fence) {
+    try {
+      return JSON.parse(fence[1].trim());
+    } catch (_) { /* fallback */ }
   }
+
+  // Extracteur robuste : trouve le PREMIER objet JSON équilibré.
+  // Gère le cas où Claude ajoute du texte avant/après ou concatène 2 JSONs.
+  const start = trimmed.indexOf("{");
+  if (start >= 0) {
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    for (let i = start; i < trimmed.length; i++) {
+      const ch = trimmed[i];
+      if (escape) { escape = false; continue; }
+      if (ch === "\\") { escape = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === "{") depth++;
+      else if (ch === "}") {
+        depth--;
+        if (depth === 0) {
+          const candidate = trimmed.substring(start, i + 1);
+          try {
+            return JSON.parse(candidate);
+          } catch (e) {
+            throw new Error(
+              `Premier objet JSON invalide à la position ${start}: ` +
+                `${(e as Error).message}. Extrait : ${candidate.substring(0, 200)}`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  throw new Error(`Aucun JSON détecté dans la réponse : ${trimmed.substring(0, 300)}`);
 }
 
 const SYSTEM_PROMPT = `Tu es un assistant pédagogique expert en analyse de sujets d'examen.
@@ -81,7 +120,17 @@ Règles ABSOLUES :
 - Détecte les exercices (Exercice 1, Question 1, etc.) et leurs sous-questions (a, b, c, 1°, 2°…)
 - Extrais les barèmes : "/2", "(3 pts)", "sur 4", "5 points", etc.
 - Si pas de barème explicite pour un exercice : mets points = 0
-- Sortie : UNIQUEMENT du JSON valide, AUCUN texte ni markdown autour
+- Les photos de tableau noir, manuscrites, ou floues mais lisibles doivent être traitées normalement
+- Ne refuse pas une image qui contient un sujet d'examen, même si la qualité est moyenne
+
+⚠️ FORMAT DE SORTIE — ULTRA STRICT :
+- Tu retournes UN SEUL objet JSON et RIEN d'autre
+- AUCUN texte avant le { d'ouverture
+- AUCUN texte après le } de fermeture
+- AUCUN markdown, AUCUN bloc \`\`\`
+- AUCUN deuxième objet JSON, AUCUNE explication
+- Ta réponse complète DOIT commencer par { et finir par }
+- Si tu n'es pas sûr, retourne {"questions": []} et c'est tout
 
 Format JSON :
 {
@@ -114,11 +163,42 @@ Deno.serve(async (req: Request): Promise<Response> => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+  // Audit 15/10/2026 — la fonction n'exigeait que la clé publique (anon) :
+  // n'importe qui pouvait utiliser Claude à nos frais avec des URLs
+  // arbitraires. On exige désormais un utilisateur connecté, des images de
+  // NOTRE bucket « subjects » déposées dans SON dossier, et un plafond.
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: userRes } = await userClient.auth.getUser();
+  const userId = userRes?.user?.id;
+  if (!userId) {
+    return new Response(JSON.stringify({ error: "Non authentifié." }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const body = await req.json();
     const imageUrls: string[] = body.imageUrls ?? [];
     if (imageUrls.length === 0) {
       throw new Error("imageUrls est requis (au moins 1 URL).");
+    }
+    if (imageUrls.length > MAX_SUBJECT_IMAGES) {
+      return new Response(
+        JSON.stringify({ error: `Trop de pages (max ${MAX_SUBJECT_IMAGES}).` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    const ownPrefix =
+      `${SUPABASE_URL.replace(/\/$/, "")}/storage/v1/object/public/subjects/${userId}/`;
+    if (imageUrls.some((u) => typeof u !== "string" || !u.startsWith(ownPrefix))) {
+      return new Response(
+        JSON.stringify({ error: "Images invalides : utilisez l'import du sujet de l'application." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     const userPrompt =

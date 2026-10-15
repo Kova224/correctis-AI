@@ -63,7 +63,7 @@ class ExamCard extends StatelessWidget {
                             if (exam.className?.isNotEmpty == true)
                               exam.className!,
                             DateFormat('d MMM yyyy', 'fr_FR')
-                                .format(exam.updatedAt),
+                                .format(exam.updatedAt.toLocal()),
                           ].join(' • '),
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: AppColors.textSecondary,

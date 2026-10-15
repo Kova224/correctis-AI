@@ -1,15 +1,20 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/billing.dart';
 import '../../models/copy.dart';
 import '../../services/exam_service.dart';
+import 'burst_camera_screen.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/primary_button.dart';
 import '../../widgets/rounded_header.dart';
 import '../../widgets/section_card.dart';
+import '../../widgets/smart_image.dart';
 import 'new_student_screen.dart';
 
 /// Étapes 2 → 5 : scan multi-pages, gestion, validation, passage au suivant (§3.4).
@@ -29,15 +34,22 @@ class _ScanSessionScreenState extends State<ScanSessionScreen> {
       context.read<ExamService>().getCopy(widget.copyId)!;
 
   Future<void> _scanPage() async {
-    final f = await _picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 70,
+    // C1 renforcé (Michel) : ouvre la caméra custom en mode BURST.
+    // Le prof enchaîne plusieurs photos sans confirmation "OK/Retry"
+    // à chaque photo. Retour ici avec la liste de toutes les pages
+    // capturées d'un coup.
+    final captured = await Navigator.of(context).push<List<String>?>(
+      MaterialPageRoute(
+        builder: (_) => const BurstCameraScreen(),
+        fullscreenDialog: true,
+      ),
     );
-    if (f == null) return;
+    if (captured == null || captured.isEmpty) return;
     final copy = _copy;
-    copy.pageImages.add(f.path);
-    await context.read<ExamService>().updateCopy(copy);
-    if (mounted) setState(() {});
+    copy.pageImages.addAll(captured);
+    if (mounted) setState(() {}); // affichage immédiat
+    // Fire-and-forget : l'upload Storage continue en background
+    context.read<ExamService>().uploadCopyPagesInBackground(copy);
   }
 
   Future<void> _addFromGallery() async {
@@ -45,15 +57,16 @@ class _ScanSessionScreenState extends State<ScanSessionScreen> {
     if (files.isEmpty) return;
     final copy = _copy;
     copy.pageImages.addAll(files.map((f) => f.path));
-    await context.read<ExamService>().updateCopy(copy);
-    if (mounted) setState(() {});
+    if (mounted) setState(() {}); // affichage immédiat
+    context.read<ExamService>().uploadCopyPagesInBackground(copy);
   }
 
   Future<void> _removePage(int index) async {
     final copy = _copy;
     copy.pageImages.removeAt(index);
-    await context.read<ExamService>().updateCopy(copy);
     if (mounted) setState(() {});
+    // Update DB en arrière-plan (pas critique)
+    unawaited(context.read<ExamService>().updateCopy(copy));
   }
 
   Future<void> _movePage(int oldIndex, int newIndex) async {
@@ -61,8 +74,8 @@ class _ScanSessionScreenState extends State<ScanSessionScreen> {
     if (newIndex > oldIndex) newIndex--;
     final item = copy.pageImages.removeAt(oldIndex);
     copy.pageImages.insert(newIndex, item);
-    await context.read<ExamService>().updateCopy(copy);
     if (mounted) setState(() {});
+    unawaited(context.read<ExamService>().updateCopy(copy));
   }
 
   Future<bool> _confirmExit() async {
@@ -102,32 +115,52 @@ class _ScanSessionScreenState extends State<ScanSessionScreen> {
       );
       return;
     }
-    setState(() => _saving = true);
-    try {
-      // Marquer pending puis lancer la correction asynchrone
-      copy.status = CopyStatus.pending;
-      await context.read<ExamService>().updateCopy(copy);
-      // Déclenche la correction en arrière-plan (non bloquant)
-      // ignore: unawaited_futures
-      context.read<ExamService>().startCorrection(copy.id);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              'Copie de ${copy.studentName} envoyée à la correction'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      if (startNew) {
-        Navigator.of(context).pushReplacement(MaterialPageRoute(
-          builder: (_) => NewStudentScreen(examId: copy.examId),
-        ));
-      } else {
-        Navigator.of(context).pop();
+    // ⚡ Navigation immédiate — l'upload et la correction se font en arrière-plan.
+    // Le prof n'attend PAS, il enchaîne directement avec l'élève suivant.
+    copy.status = CopyStatus.processing;
+    final examSvc = context.read<ExamService>();
+
+    // Lance l'upload des pages + correction en arrière-plan (fire-and-forget).
+    // Si l'upload échoue, on persiste un statut ERROR pour que le prof voie
+    // explicitement l'échec quand il consulte la copie (au lieu d'un éternel
+    // "processing" silencieux).
+    // Michel : plus d'école active — startCorrection utilise directement
+    // exam.establishmentId (défini à la création) pour cibler le bon pool.
+    // ignore: unawaited_futures
+    () async {
+      try {
+        await examSvc.updateCopy(copy);
+        await examSvc.startCorrection(copy.id);
+      } catch (e) {
+        debugPrint('[_validateCopy] background error: $e');
+        try {
+          copy.status = CopyStatus.error;
+          copy.generalComment = '❌ Échec de l\'envoi de la copie : $e';
+          await examSvc.updateCopy(copy);
+        } catch (_) {
+          // Si même cette update finale échoue (réseau coupé), on laisse
+          // tomber — la copie restera en processing local jusqu'au refresh.
+        }
       }
-    } finally {
-      if (mounted) setState(() => _saving = false);
+    }();
+
+    // Notification visuelle instantanée
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+            '✓ Copie de ${copy.studentName} envoyée — correction en cours'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    if (startNew) {
+      Navigator.of(context).pushReplacement(MaterialPageRoute(
+        builder: (_) => NewStudentScreen(examId: copy.examId),
+      ));
+    } else {
+      Navigator.of(context).pop();
     }
   }
 
@@ -139,6 +172,8 @@ class _ScanSessionScreenState extends State<ScanSessionScreen> {
       return const Scaffold(body: Center(child: Text('Copie introuvable')));
     }
     final pages = copy.pageImages;
+    // Grille v5 : crédits affichés AVANT le lancement de la correction.
+    final credits = CreditRules.creditsForPages(pages.length);
 
     return PopScope(
       canPop: false,
@@ -194,7 +229,8 @@ class _ScanSessionScreenState extends State<ScanSessionScreen> {
                         borderRadius: BorderRadius.circular(AppRadius.pill),
                       ),
                       child: Text(
-                        '${pages.length} page${pages.length > 1 ? 's' : ''} scannée${pages.length > 1 ? 's' : ''}',
+                        '${pages.length} page${pages.length > 1 ? 's' : ''} scannée${pages.length > 1 ? 's' : ''}'
+                        '${pages.isEmpty ? '' : ' · ${CreditRules.creditsLabel(credits)}'}',
                         style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
@@ -226,11 +262,13 @@ class _ScanSessionScreenState extends State<ScanSessionScreen> {
                           style: ElevatedButton.styleFrom(
                             shape: const CircleBorder(),
                             padding: EdgeInsets.zero,
-                            backgroundColor: AppColors.primary,
+                            backgroundColor: AppColors.card,
+                            side: const BorderSide(
+                                color: AppColors.borderSubtle),
                           ),
                           onPressed: _addFromGallery,
                           child: const Icon(Icons.image_outlined,
-                              color: Colors.white),
+                              color: AppColors.primaryLight),
                         ),
                       ),
                     ],
@@ -325,35 +363,57 @@ class _ScanSessionScreenState extends State<ScanSessionScreen> {
         bottomNavigationBar: SafeArea(
           child: Container(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 16,
-                  offset: const Offset(0, -4),
-                ),
-              ],
+            decoration: const BoxDecoration(
+              color: AppColors.voidBg,
+              border: Border(
+                top: BorderSide(color: AppColors.borderSubtle, width: 1),
+              ),
             ),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _saving
-                        ? null
-                        : () => _validateCopy(startNew: false),
-                    icon: const Icon(Icons.check),
-                    label: const Text('Terminer cette copie'),
+                if (pages.isNotEmpty) ...[
+                  Row(
+                    children: [
+                      const Icon(Icons.toll_outlined,
+                          size: 14, color: AppColors.textSecondary),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'La correction de cette copie consommera '
+                          '${CreditRules.creditsLabel(credits)} '
+                          '(1 crédit = jusqu\'à ${CreditRules.pagesPerCredit} pages).',
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: PrimaryButton(
-                    label: 'Nouvel élève',
-                    icon: Icons.person_add_alt_1,
-                    loading: _saving,
-                    onPressed: () => _validateCopy(startNew: true),
-                  ),
+                  const SizedBox(height: 10),
+                ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _saving
+                            ? null
+                            : () => _validateCopy(startNew: false),
+                        icon: const Icon(Icons.check),
+                        label: const Text('Terminer'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: PrimaryButton(
+                        label: 'Nouvel élève',
+                        icon: Icons.person_add_alt_1,
+                        loading: _saving,
+                        onPressed: () => _validateCopy(startNew: true),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -440,11 +500,8 @@ class _SafeImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (path.startsWith('http')) {
-      return Image.network(
-        path,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _fallback(),
-      );
+      // Bucket copies privé : SmartImage obtient un lien signé.
+      return SmartImage(path: path, errorPlaceholder: _fallback());
     }
     final file = File(path);
     if (file.existsSync()) {

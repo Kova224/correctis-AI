@@ -58,6 +58,8 @@ class StudentCopy {
   double confidence; // 0..1
   DateTime createdAt;
   DateTime? gradedAt;
+  DateTime? publishedAt; // envoi au casier de l'établissement
+  DateTime? lockedAt; // = publishedAt + 3 jours, verrouille la suppression
 
   StudentCopy({
     required this.id,
@@ -71,12 +73,55 @@ class StudentCopy {
     this.confidence = 0,
     DateTime? createdAt,
     this.gradedAt,
+    this.publishedAt,
+    this.lockedAt,
   })  : pageImages = pageImages ?? <String>[],
         grades = grades ?? <QuestionGrade>[],
         createdAt = createdAt ?? DateTime.now();
 
+  bool get isPublished => publishedAt != null;
+
+  /// True si la copie est verrouillée dans le casier admin (publication
+  /// remontant à plus de 3 jours). Dans ce cas, la suppression côté prof
+  /// ne touche plus le casier admin.
+  bool get isLocked =>
+      lockedAt != null && lockedAt!.isBefore(DateTime.now());
+
+  /// Nombre d'heures restantes avant verrouillage (utilisé pour afficher
+  /// "Verrouille dans Xh"). Retourne 0 si déjà verrouillé ou pas publié.
+  int get hoursUntilLock {
+    if (lockedAt == null) return 0;
+    final remaining = lockedAt!.difference(DateTime.now());
+    return remaining.isNegative ? 0 : remaining.inHours;
+  }
+
   double get totalScore =>
       grades.fold<double>(0, (sum, g) => sum + g.score);
+
+  /// Vrai si la copie a été détectée comme hors-sujet par l'IA.
+  bool get isOffTopic =>
+      generalComment.startsWith('⛔ HORS-SUJET — ') ||
+      generalComment.toLowerCase().contains('hors-sujet');
+
+  /// Vrai si la copie contient au moins une zone illisible signalée par l'IA.
+  bool get hasIllegibleZones =>
+      generalComment.contains('[ZONE_ILLISIBLE]');
+
+  /// Vrai si la copie est en erreur de traitement.
+  bool get hasError => status == CopyStatus.error;
+
+  /// Vrai si la copie nécessite l'attention du prof (à reprendre / corriger
+  /// manuellement). Couvre les cas hors-sujet, zones illisibles et erreurs.
+  bool get needsReview => isOffTopic || hasIllegibleZones || hasError;
+
+  /// Raison principale pour laquelle la copie doit être reprise.
+  /// Retourne null si la copie est OK.
+  String? get reviewReason {
+    if (isOffTopic) return 'Hors-sujet';
+    if (hasIllegibleZones) return 'Zones illisibles';
+    if (hasError) return 'Erreur traitement';
+    return null;
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -90,6 +135,8 @@ class StudentCopy {
         'confidence': confidence,
         'createdAt': createdAt.toIso8601String(),
         'gradedAt': gradedAt?.toIso8601String(),
+        'publishedAt': publishedAt?.toIso8601String(),
+        'lockedAt': lockedAt?.toIso8601String(),
       };
 
   factory StudentCopy.fromJson(Map<String, dynamic> json) => StudentCopy(
@@ -110,6 +157,12 @@ class StudentCopy {
         createdAt: DateTime.parse(json['createdAt'] as String),
         gradedAt: json['gradedAt'] != null
             ? DateTime.parse(json['gradedAt'] as String)
+            : null,
+        publishedAt: json['publishedAt'] != null
+            ? DateTime.parse(json['publishedAt'] as String)
+            : null,
+        lockedAt: json['lockedAt'] != null
+            ? DateTime.parse(json['lockedAt'] as String)
             : null,
       );
 }

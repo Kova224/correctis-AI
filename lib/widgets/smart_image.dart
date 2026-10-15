@@ -3,9 +3,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../utils/private_storage.dart';
 
 /// Affiche une image quelle que soit sa source :
-/// - URL HTTP/HTTPS → `Image.network`
+/// - URL HTTP/HTTPS → `Image.network` (lien signé pour les copies d'élèves,
+///   le bucket `copies` étant privé — cf. [PrivateStorage])
 /// - Chemin local (file:///, /sdcard/, etc.) → `Image.file`
 /// - Chemin vide ou fichier introuvable → placeholder
 class SmartImage extends StatelessWidget {
@@ -34,16 +36,13 @@ class SmartImage extends StatelessWidget {
       return _placeholder();
     }
     if (_isRemote) {
-      return Image.network(
-        path!,
+      return _RemoteImage(
+        url: path!,
         fit: fit,
         width: width,
         height: height,
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return _loading();
-        },
-        errorBuilder: (_, __, ___) => _error(),
+        loading: _loading(),
+        error: _error(),
       );
     }
     final file = File(path!);
@@ -81,4 +80,67 @@ class SmartImage extends StatelessWidget {
         alignment: Alignment.center,
         child: Icon(icon, color: AppColors.textMuted, size: 32),
       );
+}
+
+/// Image distante : résout d'abord un lien signé si l'URL pointe vers le
+/// bucket privé `copies`, puis affiche l'image.
+class _RemoteImage extends StatefulWidget {
+  final String url;
+  final BoxFit fit;
+  final double? width;
+  final double? height;
+  final Widget loading;
+  final Widget error;
+
+  const _RemoteImage({
+    required this.url,
+    required this.fit,
+    required this.width,
+    required this.height,
+    required this.loading,
+    required this.error,
+  });
+
+  @override
+  State<_RemoteImage> createState() => _RemoteImageState();
+}
+
+class _RemoteImageState extends State<_RemoteImage> {
+  late Future<String> _resolved;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolved = PrivateStorage.resolve(widget.url);
+  }
+
+  @override
+  void didUpdateWidget(covariant _RemoteImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) {
+      _resolved = PrivateStorage.resolve(widget.url);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String>(
+      future: _resolved,
+      builder: (context, snap) {
+        if (snap.hasError) return widget.error;
+        if (!snap.hasData) return widget.loading;
+        return Image.network(
+          snap.data!,
+          fit: widget.fit,
+          width: widget.width,
+          height: widget.height,
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return widget.loading;
+          },
+          errorBuilder: (_, __, ___) => widget.error,
+        );
+      },
+    );
+  }
 }

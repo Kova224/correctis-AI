@@ -1,0 +1,92 @@
+/* =============================================================================
+   Correctis — système de mouvement
+   Une seule signature : le stylo du correcteur. Les éléments « s'écrivent »
+   (révélation de gauche à droite, traits qui se tracent) plutôt que de voler.
+   Jetons :
+     --m-fast  160 ms  retour immédiat (survol, appui, bascule)
+     --m-base  320 ms  changement d'état ou de vue
+     --m-slow  520 ms  entrée d'une section
+     --m-ease-out     entrées       --m-ease-io  transitions
+     --m-rise  16 px  amplitude maximale d'un déplacement
+   Tout est désactivé avec « réduire les animations » (prefers-reduced-motion),
+   et rien n'est masqué si le JavaScript ne se charge pas (classe .js).
+   ========================================================================== */
+
+:root {
+  --m-fast: 160ms;
+  --m-base: 320ms;
+  --m-slow: 520ms;
+  --m-ease-out: cubic-bezier(.2, .8, .2, 1);
+  --m-ease-io: cubic-bezier(.65, 0, .35, 1);
+  --m-rise: 16px;
+}
+
+/* ── Transitions entre pages (navigateurs compatibles) ─────────────────── */
+@view-transition { navigation: auto; }
+.site-head .logo { view-transition-name: logo; }
+::view-transition-old(root) { animation: vt-out var(--m-fast) var(--m-ease-io) both; }
+::view-transition-new(root) { animation: vt-in var(--m-base) var(--m-ease-out) both; }
+@keyframes vt-out { to { opacity: 0; transform: translateY(-6px); } }
+@keyframes vt-in { from { opacity: 0; transform: translateY(10px); } }
+
+/* ── Boutons : retour au survol et à l'appui ───────────────────────────── */
+.btn { transition: transform var(--m-fast) var(--m-ease-out), box-shadow var(--m-fast) var(--m-ease-out), background-color var(--m-fast), color var(--m-fast); }
+.btn:hover { transform: translateY(-2px); }
+.btn-act:hover { box-shadow: 0 8px 18px -8px rgba(11, 138, 102, .7); }
+.btn:active { transform: translateY(0) scale(.98); box-shadow: none; transition-duration: 80ms; }
+
+/* ── En-tête : se resserre au défilement + trait d'encre de progression ── */
+.site-head { transition: box-shadow var(--m-base) var(--m-ease-out); }
+.site-head .wrap { transition: min-height var(--m-base) var(--m-ease-out); }
+.site-head.scrolled { box-shadow: 0 6px 20px -14px rgba(27, 37, 89, .45); }
+.site-head.scrolled .wrap { min-height: 56px; }
+.site-head .progress {
+  position: absolute; left: 0; bottom: -1px; height: 2px; width: 100%;
+  background: var(--pen); transform-origin: left; transform: scaleX(var(--progress, 0));
+  pointer-events: none;
+}
+
+/* Lien de navigation : soulignement au stylo, qui suit la section affichée */
+@media (min-width: 761px) {
+  .nav a:not(.btn) { position: relative; padding: 4px 0; }
+  .nav a:not(.btn)::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 2px; border-radius: 2px;
+    background: var(--pen); transform: scaleX(0); transform-origin: left;
+    transition: transform var(--m-base) var(--m-ease-out);
+  }
+  .nav a:not(.btn):hover::after, .nav a.is-active::after { transform: scaleX(1); }
+  .nav a.is-active { color: var(--ink); }
+}
+
+/* Menu mobile : ouverture */
+@media (max-width: 760px) {
+  .nav.open { animation: menu-in var(--m-base) var(--m-ease-out) both; }
+  @keyframes menu-in { from { opacity: 0; transform: translateY(-8px); } }
+}
+
+/* ── Révélations au défilement : le contenu « s'écrit » ────────────────── */
+.js [data-reveal] {
+  opacity: 0; transform: translateY(var(--m-rise));
+  transition: opacity var(--m-slow) var(--m-ease-out), transform var(--m-slow) var(--m-ease-out);
+  transition-delay: calc(var(--i, 0) * 70ms);
+}
+.js [data-reveal].is-in { opacity: 1; transform: none; }
+/* Titres : dévoilés de gauche à droite, comme une ligne qu'on écrit */
+.js h2[data-reveal] {
+  opacity: 1; transform: none; clip-path: inset(-10% 100% -10% 0);
+  transition: clip-path .7s var(--m-ease-io);
+}
+.js h2[data-reveal].is-in { clip-path: inset(-10% -2% -10% 0); }
+
+/* Trait de stylo sous un titre (appel final) */
+.pen-line { display: block; width: min(320px, 70%); height: 14px; margin: -2px auto 18px; overflow: visible; }
+.pen-line path { fill: none; stroke: var(--pen); stroke-width: 3; stroke-linecap: round; }
+.js .pen-line path { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset .8s var(--m-ease-io) .35s; }
+.js .is-in .pen-line path, .js .pen-line.is-in path { stroke-dashoffset: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .js [data-reveal], .js h2[data-reveal] { opacity: 1 !important; transform: none !important; clip-path: none !important; }
+  .js .pen-line path { stroke-dashoffset: 0 !important; }
+  .site-head .progress { display: none; }
+  @view-transition { navigation: none; }
+}

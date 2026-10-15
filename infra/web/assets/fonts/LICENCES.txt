@@ -1,0 +1,5 @@
+Polices auto-hébergées, toutes sous licence SIL Open Font License 1.1 (https://openfontlicense.org) :
+- Fraunces : Copyright 2020 The Fraunces Project Authors (github.com/undercasetype/Fraunces)
+- Atkinson Hyperlegible : Copyright 2020 Braille Institute of America, Inc.
+- Caveat : Copyright 2014 The Caveat Project Authors (github.com/googlefonts/caveat)
+Fichiers issus des paquets npm @fontsource/* (version 5.1.0), sous-ensemble latin.

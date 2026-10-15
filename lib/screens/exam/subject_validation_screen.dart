@@ -86,6 +86,95 @@ class _SubjectValidationScreenState extends State<SubjectValidationScreen> {
     });
   }
 
+  /// Demande au prof la note totale, puis répartit équitablement entre
+  /// toutes les "feuilles" (questions simples + sous-questions).
+  Future<void> _distributePoints() async {
+    if (_questions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ajoutez au moins une question d\'abord.')),
+      );
+      return;
+    }
+    final ctrl = TextEditingController(text: '20');
+    final result = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md)),
+        title: const Text('Insérer le barème'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Indiquez la note totale de l\'examen. Les points seront répartis équitablement entre toutes les questions et sous-questions.',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: ctrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Note totale (ex: 20)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final v = double.tryParse(ctrl.text.replaceAll(',', '.'));
+              if (v != null && v > 0) Navigator.pop(ctx, v);
+            },
+            child: const Text('Répartir'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null) return;
+
+    // Compte le nombre total de leaves
+    int leafCount = 0;
+    for (final q in _questions) {
+      if (q.isLeaf) {
+        leafCount++;
+      } else {
+        leafCount += q.subQuestions.length;
+      }
+    }
+    if (leafCount == 0) return;
+
+    // Répartit, arrondi au 0,5 le plus proche
+    final perLeaf = (result / leafCount * 2).roundToDouble() / 2;
+    setState(() {
+      for (final q in _questions) {
+        if (q.isLeaf) {
+          q.points = perLeaf;
+        } else {
+          for (final sub in q.subQuestions) {
+            sub.points = perLeaf;
+          }
+        }
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+            '${_fmt(perLeaf)} points par question. Total : ${_fmt(_total)} pts'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   void _addSubQuestion(int qIndex) {
     setState(() {
       final q = _questions[qIndex];
@@ -235,6 +324,12 @@ class _SubjectValidationScreenState extends State<SubjectValidationScreen> {
                         icon: const Icon(Icons.edit_note),
                         label: const Text(
                             'Saisie manuelle (recopier le sujet exact)'),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: _distributePoints,
+                        icon: const Icon(Icons.calculate_outlined),
+                        label: const Text('Insérer le barème (réparti)'),
                       ),
                     ],
                   ),
@@ -627,21 +722,30 @@ class _SubQuestionEditorState extends State<_SubQuestionEditor> {
                   controller: _label,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                      fontWeight: FontWeight.w700, color: AppColors.primary),
-                  decoration: const InputDecoration(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryLight),
+                  decoration: InputDecoration(
                     isDense: true,
-                    contentPadding: EdgeInsets.symmetric(vertical: 8),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: AppColors.card2,
                     border: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.all(Radius.circular(AppRadius.pill)),
-                      borderSide: BorderSide.none,
+                      borderRadius: const BorderRadius.all(
+                          Radius.circular(AppRadius.pill)),
+                      borderSide: const BorderSide(
+                          color: AppColors.borderSubtle),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.all(Radius.circular(AppRadius.pill)),
-                      borderSide: BorderSide.none,
+                      borderRadius: const BorderRadius.all(
+                          Radius.circular(AppRadius.pill)),
+                      borderSide: const BorderSide(
+                          color: AppColors.borderSubtle),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: const BorderRadius.all(
+                          Radius.circular(AppRadius.pill)),
+                      borderSide: const BorderSide(
+                          color: AppColors.primary, width: 1.5),
                     ),
                   ),
                   onChanged: (v) {
@@ -656,21 +760,36 @@ class _SubQuestionEditorState extends State<_SubQuestionEditor> {
                   controller: _statement,
                   maxLines: null,
                   minLines: 1,
-                  style: const TextStyle(fontSize: 13.5, height: 1.4),
-                  decoration: const InputDecoration(
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    height: 1.4,
+                    color: AppColors.textPrimary,
+                  ),
+                  decoration: InputDecoration(
                     isDense: true,
                     hintText: 'Énoncé de la sous-question…',
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    hintStyle: const TextStyle(color: AppColors.textMuted),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: AppColors.card2,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(12)),
-                      borderSide: BorderSide.none,
+                      borderRadius:
+                          const BorderRadius.all(Radius.circular(12)),
+                      borderSide: const BorderSide(
+                          color: AppColors.borderSubtle),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(12)),
-                      borderSide: BorderSide.none,
+                      borderRadius:
+                          const BorderRadius.all(Radius.circular(12)),
+                      borderSide: const BorderSide(
+                          color: AppColors.borderSubtle),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius:
+                          const BorderRadius.all(Radius.circular(12)),
+                      borderSide: const BorderSide(
+                          color: AppColors.primary, width: 1.5),
                     ),
                   ),
                   onChanged: (v) {
@@ -699,20 +818,31 @@ class _SubQuestionEditorState extends State<_SubQuestionEditor> {
                   textAlign: TextAlign.center,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
-                  style: const TextStyle(fontSize: 13.5),
-                  decoration: const InputDecoration(
+                  style: const TextStyle(
+                      fontSize: 13.5, color: AppColors.textPrimary),
+                  decoration: InputDecoration(
                     isDense: true,
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 8),
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: AppColors.card2,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(20)),
-                      borderSide: BorderSide.none,
+                      borderRadius:
+                          const BorderRadius.all(Radius.circular(20)),
+                      borderSide: const BorderSide(
+                          color: AppColors.borderSubtle),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(20)),
-                      borderSide: BorderSide.none,
+                      borderRadius:
+                          const BorderRadius.all(Radius.circular(20)),
+                      borderSide: const BorderSide(
+                          color: AppColors.borderSubtle),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius:
+                          const BorderRadius.all(Radius.circular(20)),
+                      borderSide: const BorderSide(
+                          color: AppColors.primary, width: 1.5),
                     ),
                   ),
                   onChanged: (v) {

@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Correctis : vos copies corrigées en quelques minutes</title>
+  <meta name="description" content="Correctis corrige les copies de vos élèves à partir de photos, selon votre barème. Pour les enseignants et les écoles du Bénin, du Burkina Faso, de Côte d'Ivoire, de Guinée, du Mali, du Niger, du Sénégal et du Togo.">
+  <meta property="og:title" content="Correctis : vos copies corrigées en quelques minutes">
+  <meta property="og:description" content="Photographiez le sujet et les copies. Correctis note chaque question selon votre barème. Vous relisez et publiez.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://correctis.netlify.app/assets/logo-full.png">
+  <link rel="icon" href="assets/favicon-48.png" type="image/png" sizes="48x48">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="preload" href="assets/fonts/fraunces-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/caveat-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <script>document.documentElement.classList.add('js')</script>
+  <link rel="stylesheet" href="assets/site.css">
+  <link rel="stylesheet" href="assets/motion.css">
+  <link rel="stylesheet" href="assets/home.css">
+</head>
+<body>
+  <a class="skip" href="#contenu">Aller au contenu</a>
+
+  <header class="site-head">
+    <div class="wrap">
+      <a class="logo" href="./"><img src="assets/logo-mark.png" alt="" width="40" height="40">Correctis</a>
+      <button class="menu-btn" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+      <nav class="nav" id="nav" aria-label="Navigation principale">
+        <a href="#etapes">Comment ça marche</a>
+        <a href="#ecoles">Écoles</a>
+        <a href="#tarifs">Tarifs</a>
+        <a href="#questions">Questions</a>
+        <a class="btn btn-act btn-sm" href="credits/">Acheter des crédits</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="contenu">
+    <!-- Héros -->
+    <section class="hero">
+      <div class="wrap">
+        <div>
+          <h1>Vos copies corrigées en quelques minutes, selon votre barème.</h1>
+          <p class="lead">Photographiez le sujet et les copies avec votre téléphone. Correctis note chaque question et ajoute un commentaire pour l'élève. Vous relisez, vous ajustez, vous publiez.</p>
+          <div class="hero-actions">
+            <a class="btn btn-act" href="https://play.google.com/store/apps/details?id=com.correctis.app">Télécharger l'application</a>
+            <a class="btn btn-line" href="#tarifs">Voir les tarifs</a>
+          </div>
+          <ul class="hero-facts">
+            <li>3 copies offertes à l'inscription</li>
+            <li>Paiement par Mobile Money</li>
+            <li>Sans abonnement</li>
+          </ul>
+        </div>
+
+        <figure class="copy-fig">
+          <div class="copy-tilt">
+          <div class="copy" role="img" aria-label="Exemple de copie corrigée : trois questions notées en rouge dans la marge, une remarque sur la formule de l'aire et la note de 15,5 sur 20 entourée.">
+            <div class="head">
+              <p>Aïssatou Bah, 3e A<br>Devoir n°2</p>
+            </div>
+            <div class="grade write d8">15,5/20
+              <svg viewBox="0 0 140 90" preserveAspectRatio="none"><path class="draw d8" pathLength="1" d="M118 18 C 96 2, 30 4, 12 28 C -2 50, 22 82, 70 84 C 116 86, 140 62, 130 34 C 126 22, 112 12, 96 10"/></svg>
+            </div>
+
+            <div class="qa">
+              <p class="q">1) Résoudre 3x + 5 = 20</p>
+              <p class="a">3x = 15, donc x = 5<span class="tick"><svg viewBox="0 0 30 22"><path class="draw d1" pathLength="1" d="M3 12 L11 19 L27 3"/></svg></span></p>
+              <span class="pts write d1">6/6</span>
+            </div>
+
+            <div class="qa">
+              <p class="q">2) Aire d'un disque, r = 3 cm</p>
+              <p class="a">A = <span class="under">π × 3<svg viewBox="0 0 100 10" preserveAspectRatio="none"><path class="draw d3" pathLength="1" d="M2 6 C 30 9, 60 2, 98 6"/></svg></span> = 9,42 cm²</p>
+              <span class="pts write d4">3,5/8</span>
+              <span class="remark write d4" style="top: calc(var(--line) * 1);">π r² !</span>
+            </div>
+
+            <div class="qa">
+              <p class="q">3) Périmètre de ce disque</p>
+              <p class="a">P = 2πr = 18,84 cm<span class="tick"><svg viewBox="0 0 30 22"><path class="draw d5" pathLength="1" d="M3 12 L11 19 L27 3"/></svg></span></p>
+              <span class="pts write d5">6/6</span>
+            </div>
+
+            <p class="comment write d7">Bon travail. Revois la formule de l'aire.</p>
+            <span class="scan" aria-hidden="true"></span>
+          </div>
+          </div>
+          <figcaption>La note, les points et le commentaire sont proposés par Correctis. Le professeur relit et valide.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- Étapes -->
+    <section id="etapes" class="band">
+      <div class="wrap">
+        <div class="section-intro">
+          <h2 data-reveal>Comment ça marche</h2>
+          <p class="muted" data-reveal>Tout se fait depuis l'application Android, en classe ou à la maison.</p>
+        </div>
+        <ol class="steps">
+          <li>
+            <h3>Photographiez le sujet</h3>
+            <p>Correctis lit les questions et le barème. Vous vérifiez et corrigez si besoin avant d'aller plus loin.</p>
+          </li>
+          <li>
+            <h3>Donnez la référence</h3>
+            <p>Votre corrigé type, votre cours, ou un corrigé proposé par Correctis que vous relisez et validez.</p>
+          </li>
+          <li>
+            <h3>Scannez les copies</h3>
+            <p>Page par page, une session par élève. Le scan est gratuit : seule la correction utilise des crédits.</p>
+          </li>
+          <li>
+            <h3>Relisez et publiez</h3>
+            <p>Notes par question, commentaires, classement de la classe. Vous modifiez ce que vous voulez avant de publier.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- Contrôle du professeur -->
+    <section>
+      <div class="wrap split">
+        <div>
+          <h2 data-reveal>C'est vous qui notez. Correctis vous fait gagner du temps.</h2>
+          <p class="muted" data-reveal>Correctis ne remplace pas votre jugement : il fait le premier passage, vous gardez le dernier mot sur chaque note.</p>
+        </div>
+        <ul class="points" data-stagger>
+          <li><strong>Votre barème, question par question</strong><span>Les points de chaque question et sous-question viennent du sujet que vous avez validé.</span></li>
+          <li><strong>Les passages illisibles vous sont signalés</strong><span>Vous complétez ce que l'écriture ne permet pas de lire, puis vous relancez la correction sans frais.</span></li>
+          <li><strong>Chaque note reste modifiable</strong><span>Points, commentaires, appréciation : tout s'ajuste en un geste avant la publication.</span></li>
+          <li><strong>Classement et export Excel</strong><span>Le classement de la classe est prêt, avec les mentions, à partager avec l'administration ou les parents.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Écoles -->
+    <section id="ecoles" class="band">
+      <div class="wrap">
+        <div class="section-intro">
+          <h2 data-reveal>Pour les écoles</h2>
+          <p class="muted" data-reveal>L'établissement achète les crédits une fois et les répartit entre ses enseignants. Les notes arrivent au même endroit.</p>
+        </div>
+        <ul class="school-list" data-stagger>
+          <li><strong>Un stock de crédits pour toute l'école</strong><span>L'administrateur achète un pack établissement et attribue à chaque enseignant sa part.</span></li>
+          <li><strong>Des enseignants invités en un lien</strong><span>Chaque enseignant rejoint l'école depuis l'application, avec un lien ou un QR code.</span></li>
+          <li><strong>Le casier des notes</strong><span>Les notes publiées sont visibles par classe et par élève, avec le relevé de chacun.</span></li>
+          <li><strong>Des notes qui ne bougent plus</strong><span>Trois jours après la publication, les notes sont figées : personne ne peut plus les modifier.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Tarifs -->
+    <section id="tarifs">
+      <div class="wrap">
+        <div class="section-intro">
+          <h2 data-reveal>Tarifs</h2>
+          <p class="muted" data-reveal>Vous payez les copies que vous corrigez, sans abonnement. Les prix sont fixés dans la monnaie de votre pays.</p>
+        </div>
+
+        <div class="currency" role="group" aria-label="Monnaie">
+          <button type="button" data-cur="XOF" aria-pressed="true">Francs CFA</button>
+          <button type="button" data-cur="GNF" aria-pressed="false">Francs guinéens</button>
+        </div>
+        <p class="currency-note" id="currency-note">Bénin, Burkina Faso, Côte d'Ivoire, Mali, Niger, Sénégal et Togo. Paiement par Mobile Money ou carte bancaire.</p>
+
+        <div class="price-grid" data-stagger>
+          <div class="price-block">
+            <h3>Enseignant</h3>
+            <p>Pour corriger vos propres classes.</p>
+            <table class="prices" id="prices-solo">
+              <thead><tr><th>Pack</th><th class="num">Copies</th><th class="num">Prix</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="price-block">
+            <h3>École</h3>
+            <p>Un stock commun, réparti entre les enseignants.</p>
+            <table class="prices" id="prices-school">
+              <thead><tr><th>Pack</th><th class="num">Copies</th><th class="num">Prix</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="rules" data-stagger>
+          <p><strong>1 crédit = 1 copie</strong>jusqu'à 8 pages. Au-delà : 9 à 17 pages = 2 crédits, 18 à 25 pages = 3 crédits, et ainsi de suite.</p>
+          <p><strong>Crédits valables 30 jours</strong>après l'achat. Les crédits qui expirent le plus tôt sont utilisés en premier.</p>
+          <p><strong>Rien n'est perdu en cas d'échec</strong>Si une correction échoue pour une raison technique, ses crédits reviennent automatiquement sur votre compte.</p>
+        </div>
+        <a class="btn btn-act" href="credits/">Acheter des crédits</a>
+      </div>
+    </section>
+
+    <!-- Questions -->
+    <section id="questions" class="band">
+      <div class="wrap">
+        <div class="section-intro"><h2 data-reveal>Questions fréquentes</h2></div>
+        <div class="faq" data-stagger>
+          <details>
+            <summary>Comment acheter des crédits ?</summary>
+            <p>Sur la page <a href="credits/">Acheter des crédits</a>, connectez-vous avec le même compte que dans l'application, choisissez un pack et payez par Orange Money, MTN, Moov, Wave ou Airtel selon votre pays, ou par carte bancaire en francs CFA. Les crédits apparaissent dans l'application dès que le paiement est confirmé.</p>
+          </details>
+          <details>
+            <summary>Dans quels pays Correctis est-il disponible ?</summary>
+            <p>Bénin, Burkina Faso, Côte d'Ivoire, Guinée, Mali, Niger, Sénégal et Togo. Les prix sont en francs CFA, sauf en Guinée où ils sont en francs guinéens.</p>
+          </details>
+          <details>
+            <summary>Que se passe-t-il si une copie est difficile à lire ?</summary>
+            <p>Correctis vous montre les passages qu'il n'a pas pu lire. Vous les complétez, puis vous relancez la correction de cette copie sans payer de nouveau.</p>
+          </details>
+          <details>
+            <summary>Puis-je modifier une note proposée ?</summary>
+            <p>Oui, chaque point et chaque commentaire se modifient avant la publication. Pour les écoles, les notes publiées au casier restent modifiables pendant trois jours, puis elles sont figées.</p>
+          </details>
+          <details>
+            <summary>Les copies de mes élèves sont-elles protégées ?</summary>
+            <p>Les photos des copies sont stockées dans un espace privé : seul l'enseignant qui les a envoyées peut les voir, avec des liens qui expirent au bout d'une heure. Le détail est dans notre <a href="confidentialite.html">politique de confidentialité</a>.</p>
+          </details>
+          <details>
+            <summary>Comment supprimer mon compte ?</summary>
+            <p>Dans l'application, ouvrez Profil puis Supprimer mon compte. Vous pouvez aussi suivre <a href="supprimer-compte.html">la procédure sans l'application</a>.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- Appel final -->
+    <section class="final">
+      <div class="wrap">
+        <h2 data-reveal>Essayez sur votre prochain paquet de copies.</h2>
+        <svg class="pen-line" viewBox="0 0 320 14" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M4 9 C 70 3, 150 12, 226 6 S 300 5, 316 8"/></svg>
+        <p class="muted">Les 3 premières copies sont offertes à l'inscription.</p>
+        <div class="hero-actions">
+          <a class="btn btn-act" href="https://play.google.com/store/apps/details?id=com.correctis.app">Télécharger l'application</a>
+          <a class="btn btn-line" href="credits/">Acheter des crédits</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-foot">
+    <div class="wrap">
+      <div>
+        <a class="logo" href="./"><img src="assets/logo-mark.png" alt="" width="32" height="32">Correctis</a>
+        <p class="muted" style="margin-top:10px">Correction de copies pour les enseignants et les écoles.</p>
+      </div>
+      <nav aria-label="Liens du site">
+        <a href="credits/">Acheter des crédits</a>
+        <a href="confidentialite.html">Confidentialité</a>
+        <a href="supprimer-compte.html">Supprimer mon compte</a>
+        <a href="mailto:support@correctis.app">support@correctis.app</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script src="assets/site.js"></script>
+  <script src="assets/motion.js"></script>
+</body>
+</html>

@@ -24,6 +24,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Requis par flutter_local_notifications (API Java 8 sur Android < 26)
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -33,10 +35,12 @@ android {
     defaultConfig {
         // Identifiant unique de l'app sur le Play Store
         applicationId = "com.correctis.app"
-        minSdk = flutter.minSdkVersion
+        // minSdk 23 minimum requis par flutter_local_notifications + Supabase
+        minSdk = maxOf(flutter.minSdkVersion, 23)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        multiDexEnabled = true
     }
 
     signingConfigs {
@@ -52,12 +56,12 @@ android {
 
     buildTypes {
         release {
-            // Utilise la clé de release si key.properties existe, sinon debug.
-            signingConfig = if (keystorePropertiesFile.exists()) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            // Audit 15/10/2026 : plus de repli silencieux sur la clé debug.
+            // Un AAB signé debug serait refusé par Play (ou pire, accepté sur
+            // un autre canal). Sans key.properties, le build release échoue
+            // (voir le contrôle taskGraph plus bas) ; `flutter run` (debug)
+            // n'est pas concerné.
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -70,4 +74,21 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Requis pour `isCoreLibraryDesugaringEnabled` ci-dessus
+    // (utilisé par flutter_local_notifications pour les API Java 8 récentes).
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+}
+
+// Fait échouer tout build *release* si la clé de signature est absente.
+gradle.taskGraph.whenReady {
+    val wantsRelease = allTasks.any { it.project == project && it.name.contains("Release") }
+    if (wantsRelease && !keystorePropertiesFile.exists()) {
+        throw GradleException(
+            "android/key.properties introuvable : le build release doit être signé " +
+                "avec la clé d'upload Play (voir ANDROID_BUILD.md).",
+        )
+    }
 }

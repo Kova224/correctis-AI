@@ -1,0 +1,204 @@
+/* Page d'accueil — en plus de site.css */
+
+/* ── Héros ─────────────────────────────────────────────────────────────── */
+.hero { padding: 56px 0 72px; }
+.hero .wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.02fr); gap: 56px; align-items: center; }
+.hero h1 { max-width: 15ch; }
+.hero .lead { max-width: 46ch; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 26px 0 18px; }
+.hero-facts { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px 22px; color: var(--ink-soft); font-size: var(--t-sm); }
+.hero-facts li::before { content: "✓"; color: var(--act); font-weight: 700; margin-right: 6px; }
+
+/* La copie d'élève (papier Seyès) */
+.copy-fig { margin: 0; }
+.copy {
+  --line: 32px;
+  position: relative;
+  max-width: 520px;
+  margin-left: auto;
+  padding: 24px 28px 24px 84px;
+  background-color: #fff;
+  background-image:
+    linear-gradient(90deg, transparent 63px, #e58a95 63px, #e58a95 65px, transparent 65px),
+    repeating-linear-gradient(90deg, transparent 0 31px, rgba(160, 178, 224, .35) 31px 32px),
+    repeating-linear-gradient(180deg, transparent 0 31px, #a9badf 31px 32px),
+    repeating-linear-gradient(180deg, transparent 0 7px, #dde4f4 7px 8px);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  box-shadow: 0 1px 0 #fff inset, 14px 18px 0 -2px var(--paper-shade), 14px 18px 0 -1px var(--rule);
+  transform: rotate(-1.2deg);
+  font-family: var(--f-hand);
+  font-weight: 600;
+  color: #24429a;
+  line-height: var(--line);
+  font-size: 1.45rem;
+  overflow: hidden;
+}
+.copy p { margin: 0; max-width: none; }
+.copy .head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: var(--line); }
+.copy .qa { position: relative; margin-bottom: var(--line); }
+.copy .q { color: #24429a; }
+.copy .a { padding-left: 18px; }
+.copy .pen { color: var(--pen); }
+.copy .pts { position: absolute; left: -70px; top: var(--line); width: 56px; text-align: center; color: var(--pen); font-size: 1.25rem; }
+.copy .remark { position: absolute; right: 36px; color: var(--pen); transform: rotate(-3deg); font-size: 1.3rem; }
+.copy .comment { color: var(--pen); transform: rotate(-1.5deg); transform-origin: left; }
+.copy .grade { position: absolute; top: 12px; right: 14px; width: 150px; height: 80px; display: grid; place-items: center; color: var(--pen); font-size: 2rem; white-space: nowrap; }
+.copy svg { position: absolute; pointer-events: none; overflow: visible; }
+.copy .grade svg { inset: -6px -10px; width: calc(100% + 20px); height: calc(100% + 12px); }
+.copy .tick { position: relative; display: inline-block; width: 30px; height: 22px; margin-left: 8px; }
+.copy .tick svg { inset: 0; width: 100%; height: 100%; }
+.copy .under { position: relative; white-space: nowrap; }
+.copy .under svg { left: -2px; right: -2px; bottom: 2px; width: calc(100% + 4px); height: 10px; }
+.copy svg path { fill: none; stroke: var(--pen); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.copy-fig figcaption { margin-top: 18px; text-align: right; font-size: var(--t-sm); color: var(--ink-soft); max-width: 520px; margin-left: auto; }
+
+/* ── Chorégraphie du héros (un seul passage, au chargement) ──────────────
+   0,00 s  titre, puis texte (+100 ms), boutons (+200 ms), repères (+300 ms)
+   0,20 s  la copie se pose sur le bureau
+   0,75 s  le scanner la parcourt de haut en bas (lecture par Correctis)
+   1,55 s  le stylo rouge corrige : coches, points, remarque, commentaire
+   3,20 s  la note est entourée                                            */
+.copy-fig { perspective: 1400px; }
+.copy-tilt { transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transition: transform .6s var(--m-ease-out); transform-style: preserve-3d; }
+.copy .scan {
+  position: absolute; left: 0; right: 0; top: 0; height: 64px; pointer-events: none; opacity: 0;
+  background: linear-gradient(180deg, rgba(11, 138, 102, 0) 0%, rgba(11, 138, 102, .12) 70%, rgba(11, 138, 102, .55) 98%, rgba(11, 138, 102, 0) 100%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero h1, .hero .lead, .hero-actions, .hero-facts { animation: rise var(--m-slow) var(--m-ease-out) both; }
+  .hero .lead { animation-delay: .1s; }
+  .hero-actions { animation-delay: .2s; }
+  .hero-facts { animation-delay: .3s; }
+  .copy { animation: settle .9s var(--m-ease-out) .2s both; }
+  .copy-fig figcaption { animation: rise var(--m-slow) var(--m-ease-out) 3.3s both; }
+  .copy .scan { animation: scan .85s var(--m-ease-io) .75s both; }
+
+  .copy .draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw .5s var(--m-ease-out) forwards; }
+  .copy .write { clip-path: inset(-20% 100% -20% 0); animation: write .45s var(--m-ease-io) forwards; }
+  .copy .d1 { animation-delay: 1.55s; } .copy .d2 { animation-delay: 1.8s; }
+  .copy .d3 { animation-delay: 2.0s; }  .copy .d4 { animation-delay: 2.25s; }
+  .copy .d5 { animation-delay: 2.5s; }  .copy .d6 { animation-delay: 2.7s; }
+  .copy .d7 { animation-delay: 2.8s; }  .copy .d8 { animation-delay: 3.2s; }
+  .copy .grade.write { animation-duration: .6s; }
+}
+@keyframes rise { from { opacity: 0; transform: translateY(var(--m-rise)); } }
+@keyframes settle {
+  from { opacity: 0; transform: translateY(28px) rotate(2.5deg); }
+  to { opacity: 1; transform: rotate(-1.2deg); }
+}
+@keyframes scan {
+  0% { opacity: 0; transform: translateY(-64px); }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(var(--scan-end, 520px)); }
+}
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes write { to { clip-path: inset(-20% -10% -20% 0); } }
+
+/* ── Étapes ────────────────────────────────────────────────────────────── */
+.steps { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px; counter-reset: step; }
+.steps li { counter-increment: step; position: relative; border-top: 2px solid var(--rule); padding-top: 16px; }
+.steps li::before { content: counter(step); display: block; font: 700 2.4rem/1 var(--f-display); color: var(--ink); margin-bottom: 12px; }
+/* Progression : le trait d'encre se trace et chaque étape reçoit sa coche */
+.steps li::after {
+  content: ""; position: absolute; left: 0; right: 0; top: -2px; height: 2px; background: var(--ink);
+  transform-origin: left; transform: scaleX(1);
+}
+.steps .step-tick { position: absolute; top: 14px; left: 40px; width: 30px; height: 24px; overflow: visible; }
+.steps .step-tick path { fill: none; stroke: var(--pen); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+.js .steps li::after { transform: scaleX(0); transition: transform .6s var(--m-ease-io); }
+.js .steps li::before { opacity: .35; transition: opacity var(--m-base) var(--m-ease-out); }
+.js .steps .step-tick path { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset .4s var(--m-ease-out); }
+.js .steps li.reached::after { transform: scaleX(1); }
+.js .steps li.reached::before { opacity: 1; }
+.js .steps li.reached .step-tick path { stroke-dashoffset: 0; transition-delay: .45s; }
+@media (min-width: 961px) {
+  .js .steps li.reached::after, .js .steps li.reached::before { transition-delay: calc(var(--i, 0) * 450ms); }
+  .js .steps li.reached .step-tick path { transition-delay: calc(var(--i, 0) * 450ms + .45s); }
+}
+.steps h3 { font-size: 1.12rem; margin-bottom: .4em; }
+.steps p { color: var(--ink-soft); font-size: var(--t-sm); margin: 0; }
+
+/* ── Vous gardez la main ───────────────────────────────────────────────── */
+.split { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 56px; align-items: start; }
+.points { margin: 0; padding: 0; list-style: none; }
+.points li { padding: 16px 0; border-bottom: 1px solid var(--rule); }
+.points li:first-child { padding-top: 0; }
+.points strong { display: block; font-size: 1.05rem; margin-bottom: 2px; }
+.points span { color: var(--ink-soft); }
+
+/* ── Tarifs ────────────────────────────────────────────────────────────── */
+.currency { position: relative; display: inline-flex; border: 2px solid var(--ink); border-radius: 10px; overflow: hidden; margin-bottom: 8px; }
+.currency button { position: relative; z-index: 1; font: 700 var(--t-sm) var(--f-body); border: 0; background: transparent; color: var(--ink); padding: 9px 16px; cursor: pointer; transition: color var(--m-base) var(--m-ease-out); }
+.currency button[aria-pressed="true"] { color: var(--paper); }
+.currency .pill { position: absolute; top: 0; bottom: 0; left: 0; width: 0; background: var(--ink); border-radius: 6px; transition: transform var(--m-base) var(--m-ease-io), width var(--m-base) var(--m-ease-io); }
+.no-pill .currency button[aria-pressed="true"] { background: var(--ink); }
+.prices tbody { transition: opacity var(--m-fast); }
+.prices tbody.swap { opacity: .25; }
+.currency-note { font-size: var(--t-sm); color: var(--ink-soft); margin-bottom: 28px; }
+.price-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+.price-block { background: var(--card); border: 1px solid var(--rule); border-radius: 14px; padding: 22px 22px 10px; }
+.price-block h3 { margin-bottom: .2em; }
+.price-block > p { color: var(--ink-soft); font-size: var(--t-sm); }
+table.prices { width: 100%; border-collapse: collapse; font-size: var(--t-sm); }
+.prices th { text-align: left; font-weight: 700; color: var(--ink-soft); padding: 8px 6px; border-bottom: 2px solid var(--rule); }
+.prices td { padding: 11px 6px; border-bottom: 1px solid var(--paper-shade); vertical-align: top; }
+.prices tr:last-child td { border-bottom: 0; }
+.prices .num { text-align: right; white-space: nowrap; }
+.prices td.num { font-family: var(--f-display); font-variant-numeric: tabular-nums lining-nums; }
+.prices td.num strong { font-size: 1.05rem; }
+.prices td.num .hint { font-family: var(--f-display); }
+.prices .hint { display: block; color: var(--ink-soft); font-size: var(--t-xs); }
+.prices .pop { display: inline-block; margin-left: 6px; font-size: var(--t-xs); color: var(--act); font-weight: 700; }
+.rules { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin: 34px 0 30px; }
+.rules p { font-size: var(--t-sm); margin: 0; }
+.rules strong { display: block; font-size: var(--t-md); margin-bottom: 4px; }
+.pages-scale { font-size: var(--t-sm); color: var(--ink-soft); }
+
+/* ── Écoles ────────────────────────────────────────────────────────────── */
+.school-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 40px; margin: 0; padding: 0; list-style: none; }
+.school-list strong { display: block; margin-bottom: 2px; }
+.school-list span { color: var(--ink-soft); }
+
+/* ── Questions ─────────────────────────────────────────────────────────── */
+.faq { max-width: 760px; }
+.faq details { border-bottom: 1px solid var(--rule); }
+.faq summary { cursor: pointer; list-style: none; padding: 18px 36px 18px 0; position: relative; font-weight: 700; font-size: 1.05rem; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; position: absolute; right: 4px; top: 12px; font: 400 1.6rem var(--f-display); color: var(--ink-soft); transition: transform var(--m-base) var(--m-ease-out), color var(--m-fast); }
+.faq details[open] summary::after { transform: rotate(45deg); color: var(--pen); }
+.faq summary { transition: color var(--m-fast); }
+.faq summary:hover { color: var(--act); }
+.faq details { overflow: hidden; }
+.faq details p { color: var(--ink-soft); padding-bottom: 6px; }
+
+/* ── Appel final ───────────────────────────────────────────────────────── */
+.final { text-align: center; }
+.final h2 { max-width: 22ch; margin: 0 auto .4em; }
+.final p { margin: 0 auto 24px; }
+.final .hero-actions { justify-content: center; margin-bottom: 0; }
+
+@media (max-width: 960px) {
+  .hero .wrap, .split { grid-template-columns: 1fr; gap: 40px; }
+  .copy { margin: 0 auto; }
+  .copy-fig figcaption { margin: 18px auto 0; text-align: center; }
+  .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .price-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .hero { padding-top: 32px; }
+  .copy { padding: 18px 16px 18px 66px; font-size: 1.2rem; --line: 28px;
+    background-image:
+      linear-gradient(90deg, transparent 49px, #e58a95 49px, #e58a95 51px, transparent 51px),
+      repeating-linear-gradient(90deg, transparent 0 27px, rgba(160, 178, 224, .35) 27px 28px),
+      repeating-linear-gradient(180deg, transparent 0 27px, #a9badf 27px 28px),
+      repeating-linear-gradient(180deg, transparent 0 6px, #dde4f4 6px 7px); }
+  .copy .pts { left: -60px; width: 46px; }
+  .copy .grade { width: 116px; height: 64px; font-size: 1.6rem; right: 6px; }
+  .copy .remark { right: 10px; }
+  .steps, .rules, .school-list { grid-template-columns: 1fr; }
+  .price-block { padding: 18px 14px 6px; }
+}
+.faq details.closing summary::after { transform: none; color: var(--ink-soft); }

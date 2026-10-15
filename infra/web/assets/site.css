@@ -1,0 +1,137 @@
+/* =============================================================================
+   Correctis — feuille de style commune du site
+   Motif : la copie d'élève (papier Seyès, encre bleue, stylo rouge du prof).
+   Polices auto-hébergées (licence SIL OFL) : Fraunces, Atkinson Hyperlegible,
+   Caveat (uniquement pour l'écriture manuscrite des illustrations).
+   ========================================================================== */
+
+@font-face { font-family: "Fraunces"; font-weight: 600; font-style: normal; font-display: swap; src: url("fonts/fraunces-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Fraunces"; font-weight: 700; font-style: normal; font-display: swap; src: url("fonts/fraunces-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Atkinson Hyperlegible"; font-weight: 400; font-style: normal; font-display: swap; src: url("fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Atkinson Hyperlegible"; font-weight: 400; font-style: italic; font-display: swap; src: url("fonts/atkinson-hyperlegible-latin-400-italic.woff2") format("woff2"); }
+@font-face { font-family: "Atkinson Hyperlegible"; font-weight: 700; font-style: normal; font-display: swap; src: url("fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Caveat"; font-weight: 600; font-style: normal; font-display: swap; src: url("fonts/caveat-latin-600-normal.woff2") format("woff2"); }
+
+:root {
+  /* Couleurs */
+  --paper: #fbfcff;          /* fond : papier blanc légèrement froid */
+  --paper-shade: #eef2fb;    /* bandes, zones secondaires */
+  --rule: #c9d5ef;           /* lignes Seyès, bordures */
+  --ink: #1b2559;            /* texte : encre bleu nuit */
+  --ink-soft: #4b5582;       /* texte secondaire */
+  --pen: #d3263a;            /* stylo rouge du correcteur (illustrations, rares accents) */
+  --act: #0b8a66;            /* actions : vert Correctis */
+  --act-hover: #08704f;
+  --act-text: #ffffff;
+  --card: #ffffff;
+  --focus: #2f6fed;
+
+  /* Typographie */
+  --f-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --f-body: "Atkinson Hyperlegible", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --f-hand: "Caveat", "Segoe Print", "Comic Sans MS", cursive;
+
+  /* Échelle (≈ 1,25) */
+  --t-xs: .82rem;
+  --t-sm: .92rem;
+  --t-md: 1.0625rem;
+  --t-lg: 1.3rem;
+  --t-xl: 1.75rem;
+  --t-2xl: clamp(2rem, 4.2vw, 3.05rem);
+
+  --wrap: 1120px;
+  --gutter: 16px;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 var(--t-md)/1.6 var(--f-body);
+}
+img, svg { max-width: 100%; }
+a { color: var(--act); text-underline-offset: 3px; }
+a:hover { color: var(--act-hover); }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+[hidden] { display: none !important; }
+.wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 var(--gutter); }
+.skip { position: absolute; left: -9999px; }
+.skip:focus { left: 12px; top: 12px; background: var(--card); padding: 8px 12px; z-index: 10; }
+
+h1, h2, h3 { font-family: var(--f-display); font-weight: 700; line-height: 1.15; letter-spacing: -0.01em; margin: 0 0 .5em; }
+h1 { font-size: var(--t-2xl); }
+h2 { font-size: var(--t-xl); }
+h3 { font-size: var(--t-lg); font-weight: 600; }
+p { margin: 0 0 1em; max-width: 68ch; }
+.lead { font-size: 1.15rem; color: var(--ink-soft); }
+.muted { color: var(--ink-soft); }
+
+/* ── En-tête ───────────────────────────────────────────────────────────── */
+.site-head { border-bottom: 1px solid var(--rule); background: var(--paper); position: sticky; top: 0; z-index: 5; }
+.site-head .wrap { display: flex; align-items: center; gap: 20px; min-height: 64px; }
+.logo { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font: 700 1.3rem var(--f-display); }
+.logo svg, .logo img { flex: none; }
+.logo img { width: 40px; height: 40px; }
+.site-foot .logo img { width: 32px; height: 32px; }
+.logo:hover { color: var(--ink); }
+.nav { margin-left: auto; display: flex; align-items: center; gap: 22px; }
+.nav a { color: var(--ink); text-decoration: none; font-size: var(--t-sm); }
+.nav a:hover { color: var(--act); }
+.nav a[aria-current="page"] { color: var(--act); font-weight: 700; }
+.nav a.btn-act, .nav a.btn-act:hover { color: var(--act-text); }
+.menu-btn { display: none; margin-left: auto; background: none; border: 1px solid var(--rule); border-radius: 8px; padding: 7px 12px; font: inherit; color: var(--ink); }
+
+/* ── Boutons ───────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font: 700 var(--t-md) var(--f-body); text-decoration: none; cursor: pointer;
+  padding: 12px 22px; border-radius: 10px; border: 2px solid transparent;
+}
+.btn-act { background: var(--act); color: var(--act-text); }
+.btn-act:hover { background: var(--act-hover); color: var(--act-text); }
+.btn-line { background: transparent; color: var(--ink); border-color: var(--ink); }
+.btn-line:hover { background: var(--ink); color: var(--paper); }
+.btn-sm { padding: 8px 14px; font-size: var(--t-sm); }
+
+/* ── Sections ──────────────────────────────────────────────────────────── */
+section { padding: 72px 0; }
+.band { background: var(--paper-shade); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.section-intro { max-width: 640px; margin-bottom: 36px; }
+
+/* ── Pied de page ──────────────────────────────────────────────────────── */
+.site-foot { border-top: 1px solid var(--rule); padding: 36px 0 44px; font-size: var(--t-sm); color: var(--ink-soft); }
+.site-foot .wrap { display: flex; flex-wrap: wrap; gap: 18px 32px; align-items: flex-start; justify-content: space-between; }
+.site-foot nav { display: flex; flex-wrap: wrap; gap: 10px 22px; }
+.site-foot a { color: var(--ink); }
+
+/* ── Pages de texte (confidentialité, suppression) ─────────────────────── */
+.doc { padding: 48px 0 64px; }
+.doc .wrap { max-width: 760px; }
+.doc h2 { font-size: var(--t-lg); margin-top: 2em; }
+.doc li { margin-bottom: .45em; }
+.doc .updated { color: var(--ink-soft); font-size: var(--t-sm); }
+.note {
+  border-left: 4px solid var(--act); background: var(--paper-shade);
+  padding: 14px 18px; border-radius: 0 10px 10px 0; margin: 1.4em 0;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────── */
+@media (max-width: 760px) {
+  section { padding: 52px 0; }
+  .menu-btn { display: inline-block; }
+  .nav {
+    display: none; position: absolute; top: 64px; left: 0; right: 0;
+    flex-direction: column; align-items: stretch; gap: 0;
+    background: var(--paper); border-bottom: 1px solid var(--rule); padding: 8px var(--gutter) 16px;
+  }
+  .nav.open { display: flex; }
+  .nav a { padding: 12px 0; border-bottom: 1px solid var(--paper-shade); font-size: var(--t-md); }
+  .nav .btn { margin-top: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

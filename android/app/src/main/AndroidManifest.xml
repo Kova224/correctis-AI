@@ -5,8 +5,14 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.CAMERA"/>
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <!-- Audit 15/10/2026 — politique Google Play « Photos et vidéos » :
+         l'import depuis la galerie passe par le sélecteur de photos système
+         (image_picker / file_picker), qui ne demande aucune permission.
+         READ_MEDIA_IMAGES (accès à toute la galerie) n'est pas justifié et
+         ferait refuser l'app en production → retiré. L'ancienne permission
+         de stockage reste limitée à Android ≤ 12. -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" tools:node="remove"/>
     <!-- Correctis n'utilise PAS la vidéo. On retire les permissions vidéo
          déclarées automatiquement par image_picker. -->
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" tools:node="remove"/>
@@ -45,6 +51,25 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="correctis" android:host="login-callback" />
+            </intent-filter>
+            <!-- Deep-link pour les invitations enseignants :
+                 correctis://invite?token=XXX (envoyé par email Resend). -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="correctis" android:host="invite" />
+            </intent-filter>
+            <!-- Audit 15/10/2026 : App Link vérifié pour les invitations
+                 (https://correctis.app/invite?token=XXX). Contrairement au
+                 schéma correctis://, aucune autre app ne peut l'intercepter.
+                 Nécessite https://correctis.app/.well-known/assetlinks.json
+                 (voir infra/app-links/README.md). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="correctis.app" android:pathPrefix="/invite" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

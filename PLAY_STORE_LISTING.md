@@ -108,8 +108,7 @@ Concentrez-vous sur l'essentiel : l'accompagnement de vos élèves.
 support@correctis.app
 
 📜 POLITIQUE DE CONFIDENTIALITÉ
-https://VOTRE_USERNAME.github.io/correctis-AI/privacy.html
-(à remplacer par votre vraie URL)
+https://correctis.netlify.app/confidentialite.html
 ```
 
 (~2 800 caractères, marge sous la limite ✓)
@@ -138,8 +137,8 @@ https://VOTRE_USERNAME.github.io/correctis-AI/privacy.html
 ## Coordonnées de l'éditeur
 
 - **Email** : support@correctis.app (ou ton vrai email)
-- **Site web** : https://VOTRE_USERNAME.github.io/correctis-AI/ (optionnel)
-- **Politique de confidentialité** : https://VOTRE_USERNAME.github.io/correctis-AI/privacy.html
+- **Site web** : https://correctis.netlify.app/
+- **Politique de confidentialité** : https://correctis.netlify.app/confidentialite.html
 
 ---
 

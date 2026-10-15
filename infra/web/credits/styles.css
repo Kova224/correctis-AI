@@ -1,0 +1,131 @@
+/* Page « Acheter des crédits » — en plus de ../assets/site.css
+   (mêmes couleurs, polices, en-tête et pied de page que le reste du site). */
+
+.shop { max-width: 680px; margin: 0 auto; padding: 32px var(--gutter) 48px; }
+.shop section.view { padding: 0; }
+.shop h1 { font-size: clamp(1.8rem, 4vw, 2.3rem); margin: 8px 0 8px; }
+.small { font-size: var(--t-sm); }
+.center { text-align: center; margin-left: auto; margin-right: auto; }
+.error { color: var(--pen); font-size: var(--t-sm); margin: 10px 0 0; font-weight: 700; }
+
+/* Compte connecté (dans l'en-tête) */
+.account { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; font-size: var(--t-xs); color: var(--ink-soft); min-width: 0; }
+.account span { max-width: 52vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Cartes et étapes */
+.card { background: var(--card); border: 1px solid var(--rule); border-radius: 14px; padding: 20px; margin: 18px 0; }
+.notice { border-left: 4px solid var(--pen); }
+.step-title { font: 600 1.15rem var(--f-display); margin-bottom: 14px; display: flex; align-items: center; gap: 12px; }
+.num {
+  display: inline-grid; place-items: center; width: 30px; height: 30px; flex: none;
+  border: 2px solid var(--ink); border-radius: 50%;
+  font: 700 .95rem var(--f-display); color: var(--ink);
+}
+.country-line { margin: 0 0 4px; }
+
+/* Formulaires */
+label { display: block; font-size: var(--t-sm); font-weight: 700; margin: 14px 0 6px; }
+input, select {
+  width: 100%; font: inherit; color: var(--ink); background: var(--paper);
+  border: 1.5px solid var(--rule); border-radius: 10px; padding: 12px 13px;
+}
+input:focus, select:focus { outline: 3px solid var(--focus); outline-offset: 1px; border-color: transparent; }
+
+/* Boutons de la page (indépendants des .btn-act du site) */
+.shop .btn { display: flex; width: 100%; margin-top: 16px; border-radius: 10px; }
+.btn.primary { background: var(--act); color: var(--act-text); }
+.btn.primary:hover:not(:disabled) { background: var(--act-hover); }
+.btn.outline { background: transparent; color: var(--ink); border-color: var(--ink); }
+.btn.outline:hover { background: var(--ink); color: var(--paper); }
+.btn.big { padding: 15px 18px; font-size: 1.1rem; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.link {
+  background: none; border: 0; padding: 0; font: inherit; color: var(--act);
+  cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+}
+.link.small { font-size: var(--t-sm); margin-top: 12px; }
+
+.or { display: flex; align-items: center; gap: 12px; color: var(--ink-soft); font-size: var(--t-sm); margin: 8px 0; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+
+/* Pour moi / pour mon école */
+.segmented { display: flex; border: 2px solid var(--ink); border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
+.segmented button {
+  flex: 1; font: 700 var(--t-sm) var(--f-body); border: 0; background: transparent;
+  color: var(--ink); padding: 10px; cursor: pointer;
+}
+.segmented button[aria-selected="true"] { background: var(--ink); color: var(--paper); }
+
+/* Packs */
+.packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-top: 6px; }
+.pack {
+  position: relative; text-align: left; font: inherit; color: var(--ink); cursor: pointer;
+  background: var(--paper); border: 2px solid var(--rule); border-radius: 12px; padding: 14px;
+}
+.pack:hover { border-color: var(--ink-soft); }
+.pack[aria-checked="true"] { border-color: var(--act); background: #e9f7f2; }
+.pack .name { font: 600 1.05rem var(--f-display); }
+.pack .credits { font-size: var(--t-sm); color: var(--ink-soft); }
+.pack .price { font: 700 1.3rem var(--f-display); margin-top: 8px; font-variant-numeric: lining-nums; }
+.pack .per { font-size: var(--t-xs); color: var(--ink-soft); }
+.pack .hint { font-size: var(--t-xs); color: var(--ink-soft); margin-top: 4px; }
+.pack .tag {
+  position: absolute; top: -10px; right: 10px; background: var(--act); color: var(--act-text);
+  font-size: var(--t-xs); font-weight: 700; padding: 2px 9px; border-radius: 999px;
+}
+
+/* Moyens de paiement */
+.methods { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.method {
+  font: 700 var(--t-sm) var(--f-body); color: var(--ink); cursor: pointer; text-align: left;
+  background: var(--paper); border: 2px solid var(--rule); border-radius: 10px; padding: 12px 13px;
+}
+.method:hover { border-color: var(--ink-soft); }
+.method[aria-checked="true"] { border-color: var(--act); background: #e9f7f2; }
+
+.phone { display: flex; align-items: stretch; }
+.phone span {
+  display: grid; place-items: center; padding: 0 13px; font-weight: 700;
+  background: var(--paper-shade); border: 1.5px solid var(--rule); border-right: 0;
+  border-radius: 10px 0 0 10px;
+}
+.phone input { border-radius: 0 10px 10px 0; }
+
+/* Résultat du paiement */
+.result { text-align: center; padding: 32px 20px; }
+.result h1 { margin-top: 16px; }
+.result p { margin-left: auto; margin-right: auto; }
+.result-icon { width: 64px; height: 64px; margin: 0 auto; border-radius: 50%; display: grid; place-items: center; font: 700 32px var(--f-display); }
+.result-icon.pending { border: 4px solid var(--rule); border-top-color: var(--act); animation: spin 1s linear infinite; }
+.result-icon.ok { background: #e9f7f2; color: var(--act); }
+.result-icon.ok::after { content: "✓"; }
+.result-icon.ko { background: #fbe9eb; color: var(--pen); }
+.result-icon.ko::after { content: "!"; }
+.actions .btn { max-width: 360px; margin-left: auto; margin-right: auto; }
+
+.spinner { width: 40px; height: 40px; margin: 90px auto; border: 4px solid var(--rule); border-top-color: var(--act); border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Mouvement (jetons dans ../assets/motion.css) ─────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  /* Chaque vue et chaque étape débloquée entre en scène */
+  .shop .view:not([hidden]), .shop .step:not([hidden]), .shop .notice:not([hidden]) {
+    animation: shop-rise var(--m-slow) var(--m-ease-out) both;
+  }
+  #step-pay:not([hidden]) { animation-delay: 60ms; }
+  /* Choix d'un pack ou d'un moyen de paiement : retour immédiat */
+  .pack, .method { transition: border-color var(--m-fast), background-color var(--m-fast), transform var(--m-fast) var(--m-ease-out); }
+  .pack:hover, .method:hover { transform: translateY(-2px); }
+  .pack:active, .method:active { transform: scale(.98); }
+  .pack[aria-checked="true"] { animation: pick var(--m-base) var(--m-ease-out); }
+  .pack .price { transition: color var(--m-fast); }
+  /* Message d'erreur : apparaît sans déplacer le formulaire */
+  .error:not([hidden]) { animation: shop-fade var(--m-base) var(--m-ease-out) both; }
+  /* Résultat du paiement */
+  .result-icon.ok, .result-icon.ko { animation: stamp .5s cubic-bezier(.3, 1.6, .5, 1) both; }
+  .result h1, .result p, .result .actions { animation: shop-rise var(--m-slow) var(--m-ease-out) .15s both; }
+}
+@keyframes shop-rise { from { opacity: 0; transform: translateY(12px); } }
+@keyframes shop-fade { from { opacity: 0; } }
+@keyframes pick { 40% { transform: scale(1.025); } }
+@keyframes stamp { from { opacity: 0; transform: scale(.4) rotate(-12deg); } }

@@ -1,9 +1,6 @@
-import 'dart:math';
-
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../models/copy.dart';
 import '../models/exam.dart';
 
 /// Résultat d'une correction par l'Edge Function.
@@ -15,116 +12,102 @@ class RemoteGradeResult {
 
 /// Service de correction IA.
 ///
-/// EN PROD : appelle l'Edge Function `grade-copy` (Claude + Vision côté serveur).
-/// La fonction fait l'OCR, note la copie, et met à jour la DB directement.
+/// L'unique chemin de correction est l'Edge Function `grade-copy` qui fait
+/// OCR + notation Claude et met à jour la copie en base.
 ///
-/// FALLBACK : si l'Edge Function échoue, le mock local prend le relais.
+/// ⚠️ Pas de fallback mock — si l'Edge Function échoue, la copie passe en
+/// statut ERROR et le prof voit l'erreur. C'est volontaire : un mock qui
+/// invente des notes masquerait silencieusement les vrais bugs.
 class AiCorrectionService {
   SupabaseClient get _client => Supabase.instance.client;
 
   /// Corrige une copie via l'Edge Function `grade-copy`.
   /// La fonction met à jour la copie en base — il suffit ensuite de la
   /// recharger côté app. Retourne le succès / l'erreur.
-  Future<RemoteGradeResult> gradeCopyRemote(String copyId) async {
+  Future<RemoteGradeResult> gradeCopyRemote(
+    String copyId, {
+    List<Map<String, dynamic>>? manualCorrections,
+  }) async {
+    debugPrint('[gradeCopyRemote] → invoke grade-copy avec copyId=$copyId'
+        '${manualCorrections != null ? ' + ${manualCorrections.length} HIL' : ''}');
     try {
+      final body = <String, dynamic>{'copyId': copyId};
+      if (manualCorrections != null && manualCorrections.isNotEmpty) {
+        body['manualCorrections'] = manualCorrections;
+      }
       final res = await _client.functions.invoke(
         'grade-copy',
-        body: {'copyId': copyId},
+        body: body,
       );
+      debugPrint(
+          '[gradeCopyRemote] ← status=${res.status} data_type=${res.data?.runtimeType}');
+
+      // Status HTTP non-2xx → erreur explicite
+      if (res.status != null && (res.status! < 200 || res.status! >= 300)) {
+        // Tente de récupérer le message d'erreur du body
+        String errMsg = 'HTTP ${res.status}';
+        final data = res.data;
+        if (data is Map && data['error'] != null) {
+          errMsg = '${data['error']}';
+        } else if (data is String && data.isNotEmpty) {
+          errMsg = data;
+        }
+        debugPrint('[gradeCopyRemote] ← erreur HTTP: $errMsg');
+        return RemoteGradeResult(success: false, error: errMsg);
+      }
+
       final data = res.data;
-      if (data != null && data['error'] != null) {
+      // Si le body contient {error: "..."}, c'est une erreur métier
+      if (data is Map && data['error'] != null) {
+        debugPrint('[gradeCopyRemote] ← erreur métier: ${data['error']}');
         return RemoteGradeResult(success: false, error: '${data['error']}');
       }
+      // Si le body est null ou ne contient pas grades/correction_detaillee,
+      // la fonction n'a probablement pas fait son job
+      if (data == null) {
+        return const RemoteGradeResult(
+            success: false, error: 'Réponse vide de l\'Edge Function.');
+      }
+      debugPrint('[gradeCopyRemote] ← OK');
       return const RemoteGradeResult(success: true);
+    } on FunctionException catch (e) {
+      debugPrint('[gradeCopyRemote] ← FunctionException: ${e.toString()}');
+      return RemoteGradeResult(
+          success: false,
+          error: 'Edge Function indisponible : ${e.details ?? e.reasonPhrase ?? e.status}');
     } catch (e) {
-      debugPrint('AiCorrectionService: grade-copy échoué. Cause: $e');
+      debugPrint('[gradeCopyRemote] ← exception: $e');
       return RemoteGradeResult(success: false, error: '$e');
     }
   }
 
-  /// Génère un corrigé type à partir des questions (option C).
+  /// Génère un corrigé type avec Claude (option C « Génération IA »).
+  ///
+  /// Appelle l'Edge Function `generate-answer-key`, qui lit le sujet et le
+  /// barème validés de l'examen. Le prof doit relire et VALIDER le texte
+  /// avant la correction des copies. Lance une erreur lisible en cas
+  /// d'échec (limite atteinte, IA indisponible…).
   Future<String> generateAnswerKey(Exam exam) async {
-    await Future.delayed(const Duration(seconds: 2));
-    final buffer = StringBuffer()..writeln('## Corrigé proposé\n');
-    for (final q in exam.questions) {
-      buffer.writeln(
-          '### ${q.label}  (${q.totalPoints.toStringAsFixed(q.totalPoints == q.totalPoints.roundToDouble() ? 0 : 1)} pts)');
-      if (q.statement.isNotEmpty) {
-        buffer.writeln('> ${q.statement}');
+    try {
+      final res = await _client.functions.invoke(
+        'generate-answer-key',
+        body: {'examId': exam.id},
+      );
+      final data = res.data;
+      if (data is Map && data['content'] is String &&
+          (data['content'] as String).trim().isNotEmpty) {
+        return data['content'] as String;
       }
-      if (q.isLeaf) {
-        buffer.writeln('Éléments attendus : à compléter par le professeur.');
-      } else {
-        for (final sub in q.subQuestions) {
-          buffer.writeln(
-              '- **${sub.label}** (${sub.points.toStringAsFixed(sub.points == sub.points.roundToDouble() ? 0 : 1)} pts) — ${sub.statement.isEmpty ? "à compléter" : sub.statement}');
-          buffer.writeln('  Réponse attendue : à compléter.');
-        }
+      if (data is Map && data['error'] != null) {
+        throw '${data['error']}';
       }
-      buffer.writeln();
-    }
-    buffer.writeln(
-        '— Corrigé généré automatiquement, à valider par le professeur avant utilisation.');
-    return buffer.toString();
-  }
-
-  /// Corrige une copie : retourne les notes par leaf + commentaire général.
-  /// Chaque "leaf" est soit une question simple, soit une sous-question.
-  Future<({List<QuestionGrade> grades, String generalComment, double confidence})>
-      gradeCopy({required Exam exam, required StudentCopy copy}) async {
-    // Simule un délai variable de traitement IA
-    await Future.delayed(Duration(milliseconds: 1800 + Random().nextInt(2000)));
-    final rng = Random(copy.id.hashCode);
-    final grades = <QuestionGrade>[];
-    for (final q in exam.questions) {
-      if (q.isLeaf) {
-        final ratio = 0.4 + rng.nextDouble() * 0.6;
-        final score = (q.points * ratio * 2).round() / 2;
-        grades.add(QuestionGrade(
-          questionId: q.id,
-          score: score.clamp(0, q.points).toDouble(),
-          comment: _comment(rng, score, q.points),
-        ));
-      } else {
-        for (final sub in q.subQuestions) {
-          final ratio = 0.4 + rng.nextDouble() * 0.6;
-          final score = (sub.points * ratio * 2).round() / 2;
-          grades.add(QuestionGrade(
-            questionId: sub.id,
-            score: score.clamp(0, sub.points).toDouble(),
-            comment: _comment(rng, score, sub.points),
-          ));
-        }
+      throw 'Réponse vide du service de génération.';
+    } on FunctionException catch (e) {
+      final details = e.details;
+      if (details is Map && details['error'] != null) {
+        throw '${details['error']}';
       }
+      throw 'Génération impossible (${e.status}). Réessayez dans un instant.';
     }
-    final confidence = 0.65 + rng.nextDouble() * 0.3;
-    final total = exam.computedTotal == 0 ? 1 : exam.computedTotal;
-    final globalRatio = grades.fold<double>(0, (s, g) => s + g.score) / total;
-    return (
-      grades: grades,
-      generalComment: _generalComment(globalRatio),
-      confidence: confidence,
-    );
-  }
-
-  String _comment(Random rng, double score, double max) {
-    final ratio = max == 0 ? 0 : score / max;
-    if (ratio >= 0.85) return 'Très bonne réponse, complète et bien argumentée.';
-    if (ratio >= 0.65) return 'Réponse correcte, quelques points à approfondir.';
-    if (ratio >= 0.4) return 'Réponse partielle, des notions sont manquantes.';
-    return 'Réponse insuffisante ou hors sujet.';
-  }
-
-  String _generalComment(double ratio) {
-    if (ratio >= 0.8) {
-      return 'Travail solide, excellente maîtrise des notions clés.';
-    }
-    if (ratio >= 0.6) {
-      return 'Bon travail dans l\'ensemble, à consolider sur certains points.';
-    }
-    if (ratio >= 0.4) {
-      return 'Travail moyen, plusieurs notions à revoir.';
-    }
-    return 'Beaucoup de difficultés — un suivi personnalisé est recommandé.';
   }
 }

@@ -2,14 +2,17 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/auth_service.dart';
+import '../../services/establishment_service.dart';
 import '../../services/exam_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/primary_button.dart';
 import '../auth/login_screen.dart';
+import 'support_screen.dart';
 
 /// Affiche le bottom-sheet du profil avec toutes les options.
 Future<void> showProfileSheet(BuildContext context) {
@@ -83,13 +86,20 @@ class ProfileSheet extends StatelessWidget {
                       title: 'Modifier mon profil',
                       subtitle: 'Nom, école, téléphone',
                       onTap: () async {
-                        Navigator.of(context).pop();
+                        // Capture le navigator racine AVANT de pop la sheet
+                        // (sinon le contexte est disposé et la navigation casse).
+                        final rootNav =
+                            Navigator.of(context, rootNavigator: true);
+                        Navigator.of(context).pop(); // ferme la sheet
                         await Future.delayed(
-                            const Duration(milliseconds: 200));
-                        if (context.mounted) {
-                          await Navigator.of(context).push(MaterialPageRoute(
-                            builder: (_) => const EditProfileScreen(),
-                          ));
+                            const Duration(milliseconds: 250));
+                        if (!rootNav.mounted) return;
+                        await rootNav.push(MaterialPageRoute(
+                          builder: (_) => const EditProfileScreen(),
+                        ));
+                        // Re-ouvre la sheet via le navigator racine encore vivant
+                        if (rootNav.mounted) {
+                          showProfileSheet(rootNav.context);
                         }
                       },
                     ),
@@ -102,15 +112,19 @@ class ProfileSheet extends StatelessWidget {
                       subtitle:
                           context.read<AuthService>().isOAuthOnlyAccount
                               ? 'Permet aussi le login email/password'
-                              : 'Mot de passe actuel + nouveau',
+                              : 'Nouveau mot de passe (vous restez connecté)',
                       onTap: () async {
-                        Navigator.of(context).pop();
+                        final rootNav =
+                            Navigator.of(context, rootNavigator: true);
+                        Navigator.of(context).pop(); // ferme la sheet
                         await Future.delayed(
-                            const Duration(milliseconds: 200));
-                        if (context.mounted) {
-                          await Navigator.of(context).push(MaterialPageRoute(
-                            builder: (_) => const ChangePasswordScreen(),
-                          ));
+                            const Duration(milliseconds: 250));
+                        if (!rootNav.mounted) return;
+                        await rootNav.push(MaterialPageRoute(
+                          builder: (_) => const ChangePasswordScreen(),
+                        ));
+                        if (rootNav.mounted) {
+                          showProfileSheet(rootNav.context);
                         }
                       },
                     ),
@@ -120,31 +134,12 @@ class ProfileSheet extends StatelessWidget {
                       title: 'Aide & support',
                       subtitle: 'FAQ, contact',
                       onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Bientôt disponible')),
-                        );
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => const SupportScreen(),
+                        ));
                       },
                     ),
-                    _ActionTile(
-                      icon: Icons.info_outline,
-                      iconColor: AppColors.textSecondary,
-                      title: 'À propos',
-                      subtitle: 'Correctis MVP v1.0',
-                      onTap: () {
-                        showAboutDialog(
-                          context: context,
-                          applicationName: 'Correctis',
-                          applicationVersion: '1.0.0 (MVP)',
-                          applicationIcon: const Icon(Icons.auto_awesome,
-                              color: AppColors.primary, size: 36),
-                          children: const [
-                            SizedBox(height: 8),
-                            Text(
-                                'Application de correction automatique de copies par IA.'),
-                          ],
-                        );
-                      },
-                    ),
+                    const _AboutAppTile(),
                     const SizedBox(height: 20),
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
@@ -627,6 +622,58 @@ class _ActionTile extends StatelessWidget {
   }
 }
 
+/// Tile "À propos" — affiche la version + build lus dynamiquement au runtime.
+class _AboutAppTile extends StatefulWidget {
+  const _AboutAppTile();
+  @override
+  State<_AboutAppTile> createState() => _AboutAppTileState();
+}
+
+class _AboutAppTileState extends State<_AboutAppTile> {
+  String _subtitle = 'Correctis';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() =>
+          _subtitle = 'v${info.version} · build ${info.buildNumber}');
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _ActionTile(
+      icon: Icons.info_outline,
+      iconColor: AppColors.textSecondary,
+      title: 'À propos',
+      subtitle: _subtitle,
+      onTap: () async {
+        final info = await PackageInfo.fromPlatform();
+        if (!context.mounted) return;
+        showAboutDialog(
+          context: context,
+          applicationName: 'Correctis',
+          applicationVersion: 'v${info.version} (build ${info.buildNumber})',
+          applicationIcon: const Icon(Icons.auto_awesome,
+              color: AppColors.primary, size: 36),
+          children: const [
+            SizedBox(height: 8),
+            Text(
+                'Application de correction automatique de copies par IA.'),
+          ],
+        );
+      },
+    );
+  }
+}
+
 // =============================================================================
 // ÉCRAN MODIFIER PROFIL
 // =============================================================================
@@ -731,11 +778,52 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               keyboardType: TextInputType.phone,
             ),
             const SizedBox(height: 14),
-            CustomTextField(
-              label: 'École / Établissement',
-              hint: 'Ex : Lycée Blaise Diagne',
-              controller: _school,
-              prefixIcon: Icons.school_outlined,
+            Consumer<EstablishmentService>(
+              builder: (context, estab, _) {
+                final lockedToSchool = estab.hasEstablishment;
+                if (lockedToSchool) {
+                  // Pour les profs établissement, force le champ à
+                  // l'école de l'admin et verrouille l'édition.
+                  if (_school.text != estab.currentEstablishment!.name) {
+                    _school.text = estab.currentEstablishment!.name;
+                  }
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CustomTextField(
+                      label: 'École / Établissement',
+                      hint: 'Ex : Lycée Blaise Diagne',
+                      controller: _school,
+                      prefixIcon: Icons.school_outlined,
+                      readOnly: lockedToSchool,
+                    ),
+                    if (lockedToSchool)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6, left: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.lock_outline,
+                              size: 13,
+                              color: AppColors.adminPrimary,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Géré par l\'administrateur de votre école.',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.adminPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 28),
             PrimaryButton(
@@ -831,39 +919,28 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            if (isOAuth) ...[
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info_outline, color: AppColors.primary),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Vous êtes connecté via Google. Définissez un mot de passe ici pour pouvoir aussi vous connecter avec email + mot de passe.',
-                        style: TextStyle(fontSize: 13),
-                      ),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: AppColors.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      isOAuth
+                          ? 'Vous êtes connecté via Google. Définissez un mot de passe ici pour pouvoir aussi vous connecter avec email + mot de passe.'
+                          : 'Choisissez un nouveau mot de passe. Vous restez connecté(e) après la modification.',
+                      style: const TextStyle(fontSize: 13),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 18),
-            ] else ...[
-              CustomTextField(
-                label: 'Mot de passe actuel',
-                hint: '••••••••',
-                controller: _current,
-                prefixIcon: Icons.lock_outline,
-                obscureText: true,
-                validator: (v) =>
-                    v == null || v.isEmpty ? 'Requis' : null,
-              ),
-              const SizedBox(height: 14),
-            ],
+            ),
+            const SizedBox(height: 18),
             CustomTextField(
               label: isOAuth ? 'Mot de passe' : 'Nouveau mot de passe',
               hint: 'Min. 6 caractères',

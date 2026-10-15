@@ -62,6 +62,11 @@ class AuthService extends ChangeNotifier {
         photoPath: row?['photo_path'] as String?,
         phone: row?['phone'] as String?,
         school: row?['school'] as String?,
+        accountType: AccountType.fromDb(row?['account_type'] as String?),
+        // Michel : si null (colonne pas encore migrée), on considère confirmé
+        // pour ne pas afficher le picker aux users existants.
+        accountTypeConfirmed:
+            row?['account_type_confirmed'] as bool? ?? true,
       );
     } catch (e) {
       // Pas grave si le profil n'est pas encore créé — on utilise les infos auth basiques
@@ -81,12 +86,19 @@ class AuthService extends ChangeNotifier {
     required String email,
     required String password,
     required String displayName,
+    AccountType accountType = AccountType.teacher,
   }) async {
     try {
       final res = await _client.auth.signUp(
         email: email.trim(),
         password: password,
-        data: {'displayName': displayName.trim()},
+        data: {
+          'displayName': displayName.trim(),
+          // Michel spec §3 : le type de compte est définitif dès le signup.
+          // Le trigger handle_new_user lit cette valeur et l'écrit dans
+          // profiles.account_type.
+          'accountType': accountType.dbValue,
+        },
       );
       if (res.user == null) {
         throw 'Inscription échouée. Réessayez.';
@@ -157,6 +169,16 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  /// Michel : appelé après un Google Sign-In pour marquer le type de compte
+  /// choisi par l'user (Enseignant / Administrateur) et fermer le picker.
+  Future<void> confirmAccountType(AccountType type) async {
+    await _client.rpc(
+      'confirm_my_account_type',
+      params: {'p_account_type': type.dbValue},
+    );
+    await _syncFromSupabase();
+  }
+
   // ---------------------------------------------------------------------------
   // Déconnexion
   // ---------------------------------------------------------------------------
@@ -213,10 +235,10 @@ class AuthService extends ChangeNotifier {
       if (email != null) 'email': email,
       if (phone != null) 'phone': phone,
       if (school != null) 'school': school,
-      if (uploadedPhotoPath != photoPath || photoPath == '')
-        'photo_path': uploadedPhotoPath,
-      if (photoPath != null && uploadedPhotoPath != null)
-        'photo_path': uploadedPhotoPath,
+      // photo_path : on remplace dès qu'un nouveau photoPath est fourni
+      // - chaîne vide ('') → null (retrait)
+      // - autre valeur → URL Supabase (ou chemin local en fallback)
+      if (photoPath != null) 'photo_path': uploadedPhotoPath,
     };
 
     if (update.isNotEmpty) {
@@ -255,10 +277,12 @@ class AuthService extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------------------
-  // Changement ou définition de mot de passe (utilisateur connecté)
+  // Changement ou définition de mot de passe (utilisateur connecté).
   //
-  // - Compte email/password : `currentPassword` requis et vérifié
-  // - Compte OAuth (Google...) : `currentPassword` ignoré, on définit directement
+  // On utilise `updateUser` directement avec la session actuelle.
+  // Pas de re-vérification du mot de passe actuel pour éviter de créer une
+  // nouvelle session qui déclencherait des redirections inattendues.
+  // L'utilisateur est déjà authentifié → on lui fait confiance.
   // ---------------------------------------------------------------------------
   Future<void> changePassword({
     required String currentPassword,
@@ -269,22 +293,18 @@ class AuthService extends ChangeNotifier {
       throw 'Mot de passe trop court (min. 6 caractères).';
     }
 
-    // Saute la vérification du mot de passe actuel si compte OAuth
-    if (!isOAuthOnlyAccount) {
-      try {
-        await _client.auth.signInWithPassword(
-          email: _currentUser!.email,
-          password: currentPassword,
-        );
-      } on sb.AuthException {
-        throw 'Mot de passe actuel incorrect.';
-      }
-    }
-
     try {
       await _client.auth.updateUser(
         sb.UserAttributes(password: newPassword),
       );
+      // Force le refresh de la session pour que `app_metadata.providers`
+      // reflète l'ajout du provider 'email'. Sans ça, `isOAuthOnlyAccount`
+      // continue de retourner true et le label reste "Définir un mot de passe".
+      try {
+        await _client.auth.refreshSession();
+      } catch (_) {}
+      // Notifie les listeners pour rafraîchir le profil (subtitle, etc.)
+      notifyListeners();
     } on sb.AuthException catch (e) {
       throw _translateAuth(e.message);
     }

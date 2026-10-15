@@ -5,9 +5,8 @@ import '../../models/chat_message.dart';
 import '../../services/chatbot_service.dart';
 import '../../theme/app_theme.dart';
 
-/// Affiche la sheet du chatbot Correctis (modale draggable plein écran).
+/// Affiche la sheet du chatbot Correctis — V2 dark mode style maquette.
 Future<void> showChatBotSheet(BuildContext context) async {
-  // Charger l'historique avant d'ouvrir
   await context.read<ChatBotService>().bootstrap();
   if (!context.mounted) return;
   await showModalBottomSheet<void>(
@@ -30,7 +29,10 @@ class _ChatBotSheet extends StatelessWidget {
       builder: (context, scrollController) {
         return Container(
           decoration: const BoxDecoration(
-            color: AppColors.background,
+            color: AppColors.voidBg,
+            border: Border(
+              top: BorderSide(color: AppColors.borderSubtle, width: 1),
+            ),
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
           child: Column(
@@ -49,20 +51,27 @@ class _ChatBotSheet extends StatelessWidget {
 }
 
 // =============================================================================
-// HEADER
+// HEADER — style maquette dark avec gradient subtil
 // =============================================================================
 class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 10, 8, 14),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.primary, AppColors.primaryLight],
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: const Alignment(0, -0.5),
+          radius: 2.0,
+          colors: [
+            AppColors.profPrimary.withValues(alpha: 0.18),
+            AppColors.voidBg,
+          ],
+          stops: const [0.0, 1.0],
         ),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        border: const Border(
+          bottom: BorderSide(color: AppColors.borderSubtle, width: 1),
+        ),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Column(
         children: [
@@ -70,7 +79,7 @@ class _Header extends StatelessWidget {
             width: 44,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.4),
+              color: AppColors.borderSubtle,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -82,35 +91,42 @@ class _Header extends StatelessWidget {
                 Container(
                   width: 44,
                   height: 44,
-                  decoration: const BoxDecoration(
-                    color: AppColors.accent,
+                  decoration: BoxDecoration(
+                    gradient: AppColors.profGradient,
                     shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.profPrimary.withValues(alpha: 0.4),
+                        blurRadius: 18,
+                      ),
+                    ],
                   ),
-                  child: const Icon(Icons.smart_toy_outlined,
-                      color: Colors.white, size: 22),
+                  child: const Icon(Icons.auto_awesome,
+                      color: Colors.white, size: 20),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Correctis Chatbot',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
+                        style: AppFonts.fraunces(
                           fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       Row(
                         children: [
-                          _StatusDot(),
-                          SizedBox(width: 6),
+                          const _StatusDot(),
+                          const SizedBox(width: 6),
                           Text(
                             'Toujours disponible',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
+                            style: AppFonts.mono(
+                              fontSize: 10,
+                              color: AppColors.profPrimary,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ],
@@ -120,7 +136,8 @@ class _Header extends StatelessWidget {
                 ),
                 IconButton(
                   tooltip: 'Nouvelle discussion',
-                  icon: const Icon(Icons.refresh, color: Colors.white),
+                  icon: const Icon(Icons.refresh,
+                      color: AppColors.textSecondary, size: 20),
                   onPressed: () async {
                     final ok = await showDialog<bool>(
                       context: context,
@@ -150,7 +167,8 @@ class _Header extends StatelessWidget {
                   },
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
+                  icon: const Icon(Icons.close,
+                      color: AppColors.textSecondary, size: 20),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -168,12 +186,17 @@ class _StatusDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 8,
-      height: 8,
+      width: 6,
+      height: 6,
       decoration: BoxDecoration(
-        color: AppColors.success,
+        color: AppColors.profPrimary,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.profPrimary,
+            blurRadius: 6,
+          ),
+        ],
       ),
     );
   }
@@ -211,7 +234,6 @@ class _ChatListState extends State<_ChatList> {
     final svc = context.watch<ChatBotService>();
     final messages = svc.messages;
 
-    // Auto-scroll quand un nouveau message arrive
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
 
     return ListView.builder(
@@ -268,37 +290,45 @@ class _MessageBubble extends StatelessWidget {
               ],
               Flexible(
                 child: Container(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                  padding: const EdgeInsets.fromLTRB(14, 11, 14, 12),
                   constraints: BoxConstraints(
                     maxWidth: MediaQuery.of(context).size.width * 0.78,
                   ),
                   decoration: BoxDecoration(
-                    color: isUser ? AppColors.primary : AppColors.surface,
+                    // User : gradient vert prof
+                    // Bot : card sombre avec bordure subtile
+                    gradient: isUser ? AppColors.profGradient : null,
+                    color: isUser ? null : AppColors.card,
+                    border: isUser
+                        ? null
+                        : Border.all(color: AppColors.borderSubtle),
                     borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(18),
-                      topRight: const Radius.circular(18),
-                      bottomLeft: Radius.circular(isUser ? 18 : 4),
-                      bottomRight: Radius.circular(isUser ? 4 : 18),
+                      topLeft: const Radius.circular(16),
+                      topRight: const Radius.circular(16),
+                      bottomLeft: Radius.circular(isUser ? 16 : 4),
+                      bottomRight: Radius.circular(isUser ? 4 : 16),
                     ),
                     boxShadow: isUser
-                        ? null
-                        : [
+                        ? [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 10,
+                              color: AppColors.profPrimary
+                                  .withValues(alpha: 0.25),
+                              blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
-                          ],
+                          ]
+                        : null,
                   ),
                   child: _RichBubbleText(
                     text: message.text,
-                    color: isUser ? Colors.white : AppColors.textPrimary,
+                    color:
+                        isUser ? Colors.white : AppColors.textPrimary,
+                    isUser: isUser,
                   ),
                 ),
               ),
             ],
           ),
-          // Suggestions sous le dernier message bot
           if (showSuggestions &&
               message.suggestions != null &&
               message.suggestions!.isNotEmpty) ...[
@@ -329,14 +359,20 @@ class _BotAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 30,
-      height: 30,
-      decoration: const BoxDecoration(
-        color: AppColors.accent,
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        gradient: AppColors.profGradient,
         shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.profPrimary.withValues(alpha: 0.35),
+            blurRadius: 10,
+          ),
+        ],
       ),
-      child: const Icon(Icons.smart_toy_outlined,
-          color: Colors.white, size: 16),
+      child: const Icon(Icons.auto_awesome,
+          color: Colors.white, size: 14),
     );
   }
 }
@@ -349,19 +385,26 @@ class _SuggestionChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.primary.withValues(alpha: 0.08),
+      color: AppColors.primary.withValues(alpha: 0.1),
       borderRadius: BorderRadius.circular(AppRadius.pill),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadius.pill),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        child: Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.3),
+            ),
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+          ),
           child: Text(
             label,
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w600,
-              fontSize: 12.5,
+            style: AppFonts.sans(
+              fontSize: 12,
+              color: AppColors.primaryLight,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),
@@ -370,28 +413,32 @@ class _SuggestionChip extends StatelessWidget {
   }
 }
 
-/// Affiche le texte avec mise en forme simple (gras `**...**`, listes, code).
+/// Texte enrichi (gras `**...**`, code `\`...\``) — adapté au dark mode.
 class _RichBubbleText extends StatelessWidget {
   final String text;
   final Color color;
-  const _RichBubbleText({required this.text, required this.color});
+  final bool isUser;
+  const _RichBubbleText({
+    required this.text,
+    required this.color,
+    required this.isUser,
+  });
 
   @override
   Widget build(BuildContext context) {
     final spans = _parseInline(text, color);
     return RichText(
       text: TextSpan(
-        style: TextStyle(
-            color: color, fontSize: 14, height: 1.45),
+        style: AppFonts.sans(
+          fontSize: 13.5,
+          color: color,
+          height: 1.5,
+        ),
         children: spans,
       ),
     );
   }
 
-  /// Parser minimal :
-  ///   **gras** → bold
-  ///   `code` → monospace
-  ///   conserve les \n
   List<TextSpan> _parseInline(String text, Color color) {
     final result = <TextSpan>[];
     final regex = RegExp(r'(\*\*[^*]+\*\*|`[^`]+`)');
@@ -411,10 +458,11 @@ class _RichBubbleText extends StatelessWidget {
           text: token.substring(1, token.length - 1),
           style: TextStyle(
             fontFamily: 'monospace',
-            backgroundColor: color == Colors.white
-                ? Colors.white.withValues(alpha: 0.15)
-                : AppColors.surfaceMuted,
-            fontSize: 13,
+            backgroundColor: isUser
+                ? Colors.white.withValues(alpha: 0.18)
+                : AppColors.card2,
+            color: isUser ? Colors.white : AppColors.primaryLight,
+            fontSize: 12.5,
           ),
         ));
       }
@@ -468,20 +516,14 @@ class _TypingBubbleState extends State<_TypingBubble>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: AppColors.card,
+              border: Border.all(color: AppColors.borderSubtle),
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(18),
-                topRight: Radius.circular(18),
-                bottomRight: Radius.circular(18),
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+                bottomRight: Radius.circular(16),
                 bottomLeft: Radius.circular(4),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
             ),
             child: AnimatedBuilder(
               animation: _ctrl,
@@ -496,10 +538,10 @@ class _TypingBubbleState extends State<_TypingBubble>
                       child: Transform.scale(
                         scale: scale,
                         child: Container(
-                          width: 8,
-                          height: 8,
+                          width: 7,
+                          height: 7,
                           decoration: const BoxDecoration(
-                            color: AppColors.primary,
+                            color: AppColors.profPrimary,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -557,16 +599,13 @@ class _ComposerState extends State<_Composer> {
   @override
   Widget build(BuildContext context) {
     final svc = context.watch<ChatBotService>();
+    final canSend = _hasText && !svc.isTyping;
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-          ),
-        ],
+      decoration: const BoxDecoration(
+        color: AppColors.voidBg,
+        border: Border(
+          top: BorderSide(color: AppColors.borderSubtle, width: 1),
+        ),
       ),
       child: SafeArea(
         top: false,
@@ -582,24 +621,36 @@ class _ComposerState extends State<_Composer> {
                   minLines: 1,
                   maxLines: 5,
                   textCapitalization: TextCapitalization.sentences,
+                  style: AppFonts.sans(
+                    fontSize: 13.5,
+                    color: AppColors.textPrimary,
+                  ),
                   decoration: InputDecoration(
                     hintText: 'Écrivez votre message…',
+                    hintStyle: AppFonts.sans(
+                      fontSize: 13.5,
+                      color: AppColors.textMuted,
+                    ),
                     filled: true,
-                    fillColor: AppColors.surfaceMuted,
+                    fillColor: AppColors.card,
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 18, vertical: 12),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppRadius.pill),
-                      borderSide: BorderSide.none,
+                      borderSide: const BorderSide(
+                        color: AppColors.borderSubtle,
+                      ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppRadius.pill),
-                      borderSide: BorderSide.none,
+                      borderSide: const BorderSide(
+                        color: AppColors.borderSubtle,
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppRadius.pill),
                       borderSide: const BorderSide(
-                          color: AppColors.primary, width: 1.5),
+                          color: AppColors.profPrimary, width: 1.5),
                     ),
                   ),
                   onSubmitted: (_) => _send(),
@@ -607,21 +658,41 @@ class _ComposerState extends State<_Composer> {
               ),
               const SizedBox(width: 6),
               AnimatedScale(
-                scale: _hasText && !svc.isTyping ? 1.0 : 0.85,
+                scale: canSend ? 1.0 : 0.85,
                 duration: const Duration(milliseconds: 180),
-                child: Material(
-                  color: _hasText
-                      ? AppColors.accent
-                      : AppColors.primary.withValues(alpha: 0.4),
-                  shape: const CircleBorder(),
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: _hasText && !svc.isTyping ? _send : null,
-                    child: const SizedBox(
-                      width: 46,
-                      height: 46,
-                      child: Icon(Icons.send_rounded,
-                          color: Colors.white, size: 20),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: canSend ? AppColors.profGradient : null,
+                    color: canSend ? null : AppColors.card,
+                    border: canSend
+                        ? null
+                        : Border.all(color: AppColors.borderSubtle),
+                    shape: BoxShape.circle,
+                    boxShadow: canSend
+                        ? [
+                            BoxShadow(
+                              color: AppColors.profPrimary
+                                  .withValues(alpha: 0.35),
+                              blurRadius: 14,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: canSend ? _send : null,
+                      child: SizedBox(
+                        width: 46,
+                        height: 46,
+                        child: Icon(
+                          Icons.send_rounded,
+                          color: canSend ? Colors.white : AppColors.textMuted,
+                          size: 18,
+                        ),
+                      ),
                     ),
                   ),
                 ),

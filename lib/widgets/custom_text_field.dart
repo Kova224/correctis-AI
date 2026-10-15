@@ -16,6 +16,7 @@ class CustomTextField extends StatefulWidget {
   final ValueChanged<String>? onSubmitted;
   final int? maxLines;
   final int? minLines;
+  final bool readOnly;
 
   const CustomTextField({
     super.key,
@@ -32,6 +33,7 @@ class CustomTextField extends StatefulWidget {
     this.onSubmitted,
     this.maxLines = 1,
     this.minLines,
+    this.readOnly = false,
   });
 
   @override
@@ -74,6 +76,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
           textInputAction: widget.textInputAction,
           onChanged: widget.onChanged,
           onFieldSubmitted: widget.onSubmitted,
+          readOnly: widget.readOnly,
           maxLines: widget.obscureText ? 1 : widget.maxLines,
           minLines: widget.minLines,
           style: TextStyle(color: textColor, fontSize: 15),
@@ -88,9 +91,11 @@ class _CustomTextFieldState extends State<CustomTextField> {
             suffixIcon: widget.obscureText
                 ? IconButton(
                     icon: Icon(
+                      // Œil barré quand le mot de passe est caché (état actuel)
+                      // → tap pour révéler. Œil ouvert quand visible → tap pour cacher.
                       _obscure
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
                       color: hintColor,
                       size: 20,
                     ),
